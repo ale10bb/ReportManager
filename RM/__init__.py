@@ -162,7 +162,7 @@ if dedicate_win32_to_test:
         logger.info('dedicate_win32: {}'.format(dedicate_win32_to_test))
         var.dedicate_win32 = dedicate_win32_to_test
     except:
-        logger.exception('invalid dedicate_win32')
+        logger.warning('invalid dedicate_win32', exc_info=True)
         var.dedicate_win32 = ''
 
 # ---主消息队列---
