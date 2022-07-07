@@ -332,7 +332,7 @@ def do_resend(target:tuple, redirect:str=''):
     codes.sort()
     work_path = list(dir_paths(filtered_walk(
         os.path.join(var.storage, 'temp' if type(target[0]) == str else 'archive'), 
-        included_dirs=['*_{}_{}'.format(target[1], '+'.join(codes))], 
+        included_dirs=['*{}'.format('+'.join(codes))], 
         depth=1, 
         min_depth=1
     )))[-1]
