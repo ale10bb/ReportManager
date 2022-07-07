@@ -50,8 +50,18 @@ def init(pop3_config:dict={}, smtp_config:dict={}, mail_config:dict={}):
     logger.info('default_cc: {}'.format(mail_config['default_cc']))
     assert type(mail_config.setdefault('max_attachments_size', 25)) == int, 'invalid arg: mail_config.max_attachments_size'
     logger.info('max_attachments_size: {}'.format(mail_config['max_attachments_size']))
-    assert type(mail_config.setdefault('large_attachment_handler', '')) == str, 'invalid arg: mail_config.large_attachment_handler'
-    logger.info('large_attachment_handler: {}'.format(mail_config['large_attachment_handler']))
+    if mail_config.setdefault('large_attachment_handler', ''):
+        try:
+            with open(os.path.join('template', 'test_win32.doc'),'rb') as f:
+                files = {'attachment': f}
+                r = requests.post(mail_config['large_attachment_handler'], files=files, timeout=60).json()
+            assert not r['result'], r['err']
+            assert r['data']['name'] == 'test_win32.doc'
+            assert requests.head(r['data']['url']).status_code == 200
+            logger.info('large_attachment_handler: {}'.format(mail_config['large_attachment_handler']))
+        except:
+            logger.warning('invalid arg: mail_config.large_attachment_handler', exc_info=True)
+            mail_config['large_attachment_handler'] = ''
     var.mail_config = mail_config
 
 
