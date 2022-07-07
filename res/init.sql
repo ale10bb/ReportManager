@@ -1,0 +1,67 @@
+DROP TABLE IF EXISTS `user`;
+CREATE TABLE `user` (
+  `id` VARCHAR(20) NOT NULL PRIMARY KEY COMMENT '邮箱username',
+  `name` VARCHAR(40) DEFAULT '' COMMENT '姓名',
+  `phone` VARCHAR(20) DEFAULT '' COMMENT '钉钉绑定电话号码',
+  `role` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '0非审核人/1审核人',
+  `pages` SMALLINT NOT NULL DEFAULT 0 COMMENT '已审核页数',
+  `available` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '0禁用/1启用',
+  `status` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '0正常/1不审加急/2不审报告',
+  `status_since` TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT 'status的上次修改时间'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
+DROP TABLE IF EXISTS `current`;
+CREATE TABLE `current` (
+  `id` CHAR(64) NOT NULL PRIMARY KEY,
+  `names` JSON COMMENT '{"项目编号": "名称"}',
+  `company` VARCHAR(200) DEFAULT '' COMMENT '委托单位',
+  `pages` SMALLINT NOT NULL DEFAULT 0 COMMENT '页数',
+  `urgent` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否加急',
+  `authorid` VARCHAR(20) DEFAULT '' COMMENT '作者ID',
+  `reviewerid` VARCHAR(20) DEFAULT '' COMMENT '审核人ID',
+  `start` TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '提交的时间戳'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
+DROP TABLE IF EXISTS `history`;
+CREATE TABLE `history` (
+  `id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  `names` JSON COMMENT '{"项目编号": "名称"}',
+  `company` VARCHAR(200) DEFAULT '' COMMENT '委托单位',
+  `pages` SMALLINT NOT NULL DEFAULT 0 COMMENT '页数',
+  `urgent` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否加急',
+  `authorid` VARCHAR(20) DEFAULT '' COMMENT '作者ID',
+  `reviewerid` VARCHAR(20) DEFAULT '' COMMENT '审核人ID',
+  `start` TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '提交的时间戳',
+  `end` TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '完成的时间戳'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
+DROP TABLE IF EXISTS `log_mail`;
+CREATE TABLE `log_mail` (
+  `id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  `time` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  `operator` VARCHAR(20) DEFAULT '',
+  `keyword` TEXT,
+  `error` TEXT,
+  `warnings` TEXT,
+  `mail` JSON,
+  `content` JSON,
+  `attachment` JSON,
+  `target` JSON,
+  `notification` JSON,
+  `work_path` TEXT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
+DROP TABLE IF EXISTS `log_manage`;
+CREATE TABLE `log_manage` (
+  `id` INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  `time` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  `ip` VARBINARY(16),
+  `user_agent` TEXT,
+  `url` VARCHAR(50) DEFAULT '',
+  `param` JSON,
+  `result` JSON
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

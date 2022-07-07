@@ -1,0 +1,16 @@
+Flask
+zmail
+walkdir
+python-docx
+mysql-connector-python
+DBUtils
+DingtalkChatbot
+requests
+chinesecalendar
+
+# -- webserver --
+# gunicorn[gevent]
+
+# -- win32 --
+# pywin32
+# waitress
