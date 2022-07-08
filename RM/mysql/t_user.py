@@ -136,7 +136,7 @@ def pop(count:int=1, excludes:list=None, urgent:bool=False, hide_busy:bool=True)
         hide_busy(bool): 是否隐藏status=2（可选/默认值True）；
 
     Returns:
-        [(id, name, phone, role, status, current), ...]：长度为{count}的审核人ID元组列表，每个元组包括用户信息和当前报告数量（长度不超过审核人总数）
+        [(id, name, phone, role, status, pages_diff, current), ...]：长度为{count}的审核人ID元组列表，每个元组包括用户信息和当前报告数量（长度不超过审核人总数）
 
     Raises:
         AssertionError: 如果参数类型非法
@@ -154,13 +154,12 @@ def pop(count:int=1, excludes:list=None, urgent:bool=False, hide_busy:bool=True)
             # 选择未审核紧急报告的审核人，按工作量（当前报告、总页数）排序
             # 选择status=0的审核人
             cursor.execute('''
-                SELECT id, name, phone, role, status, IFNULL(r.current, 0) AS current
-                FROM user 
-                LEFT JOIN (
+                SELECT id, name, phone, role, status, (pages - min_pages) AS pages_diff, IFNULL(r.current, 0) AS current
+                FROM user LEFT JOIN (
                     SELECT reviewerid, COUNT(1) AS current
                     FROM current
                     GROUP BY reviewerid 
-                ) AS r ON id = reviewerid 
+                ) AS r ON id = reviewerid, (SELECT MIN(pages) AS min_pages FROM user WHERE available = 1 AND role = 1) AS _
                 WHERE user.available = 1 AND user.role = 1 AND user.status = 0 AND NOT EXISTS(
                     SELECT reviewerid FROM current WHERE reviewerid = user.id AND urgent = 1
                 ) AND user.id NOT IN (
@@ -177,13 +176,12 @@ def pop(count:int=1, excludes:list=None, urgent:bool=False, hide_busy:bool=True)
         # 选择审核人，按工作量（当前报告、当前页数）排序
         # 如果所有人都有加急报告，则fallback到普通情况。因此在urgent情况之后，也拼接普通情况的结果
         cursor.execute('''
-            SELECT id, name, phone, role, status, IFNULL(r.current, 0) AS current
-            FROM user
-            LEFT JOIN (
+            SELECT id, name, phone, role, status, (pages - min_pages) AS pages_diff, IFNULL(r.current, 0) AS current
+            FROM user LEFT JOIN (
                 SELECT reviewerid, COUNT(1) AS current
                 FROM current
                 GROUP BY reviewerid 
-            ) AS r ON id = reviewerid 
+            ) AS r ON id = reviewerid, (SELECT MIN(pages) AS min_pages FROM user WHERE available = 1 AND role = 1) AS _
             WHERE user.available = 1 AND user.role = 1 AND (user.status = 0 OR user.status = 1) AND user.id NOT IN (
                 SELECT latest_history.reviewerid
                 FROM (SELECT reviewerid, end FROM history ORDER BY id DESC LIMIT 1) AS latest_history
@@ -199,13 +197,12 @@ def pop(count:int=1, excludes:list=None, urgent:bool=False, hide_busy:bool=True)
         # 如果设置了显示忙碌状态的用户，则在列表最后分别拼接status=2及临时跳过(status=-1)的用户
         if not hide_busy:
             cursor.execute('''
-                SELECT id, name, phone, role, status, IFNULL(r.current, 0) AS current
-                FROM user
-                LEFT JOIN (
+                SELECT id, name, phone, role, status, (pages - min_pages) AS pages_diff, IFNULL(r.current, 0) AS current
+                FROM user LEFT JOIN (
                     SELECT reviewerid, COUNT(1) AS current
                     FROM current
                     GROUP BY reviewerid 
-                ) AS r ON id = reviewerid 
+                ) AS r ON id = reviewerid , (SELECT MIN(pages) AS min_pages FROM user WHERE available = 1 AND role = 1) AS _
                 WHERE user.available = 1 AND user.role = 1 AND (user.status = 2)
                 UNION SELECT id, name, phone, role, -1, IFNULL(r.current, 0) AS current
                 FROM user

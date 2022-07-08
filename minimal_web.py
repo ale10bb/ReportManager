@@ -390,7 +390,7 @@ def list_queue():
     try:
         request_body = {}
         request_body.update(request.json)
-        keys = ['id', 'name', 'phone', 'role', 'status', 'current']
+        keys = ['id', 'name', 'phone', 'role', 'status', 'pages_diff', 'current']
         for row in RM.mysql.t_user.pop(count=9999, urgent=False, hide_busy=False):
             ret['data']['normal'].append(dict(zip(keys, row)))
             ret['data']['normal'][-1]['phone'] = ''

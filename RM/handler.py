@@ -37,7 +37,12 @@ def do_attend():
 
     # Part 2: 分配队列
     queue = mysql.t_user.pop(count=5)
-    part2 = '**分配队列**\n\n' + '\n'.join(['1. ' + row[1] for row in queue])
+    part2 = '**分配队列**\n\n' + '\n'.join([
+        '1. {}{}'.format(
+            row[1],
+            ' (+{})'.format(row[5]) if row[5] else ''
+        ) for row in queue
+    ])
     logger.info('queue: {}'.format(queue))
 
     # 发送card通知
