@@ -12,14 +12,28 @@ from . import notification, validator
 from . import var
 
 def do_attend():
-    ''' 打卡提醒函数的主入口。调用后向主通知群发送打卡提示，包含当前任务、分配队列和交互入口。
+    ''' 打卡提醒函数的主入口。调用后向主通知群发送打卡提示，包含当前任务、分配队列和交互入口。向企业微信发送任务提醒。
     '''
     logger = logging.getLogger(__name__)
     
-    # Part 1: 当前项目
-    # 拉取current中的所有内容
+    # 准备通知所需数据
+    currents = mysql.t_current.search()['all']
+    # 24小时没有动作的情况下跳过信息输出
+    if not currents and (datetime.datetime.now().timestamp() - mysql.t_history.pop()[6] > 86400):
+        logger.debug('skipped output')
+        return
+    logger.info('currents: {}'.format(currents))
+    queue = mysql.t_user.pop(count=9999, hide_busy=False)
+    logger.info('queue: {}'.format(queue))
+    currents_group_by_user_id = {}
+    for user_id in [item[0] for item in queue]:
+        currents_group_by_user_id[user_id] = []
+    for project in currents:
+        currents_group_by_user_id[project[3]].append('+'.join(json.loads(project[10]).keys()))
+
+    # 钉钉当前项目
     lines = []
-    for project in mysql.t_current.search()['all']:
+    for project in currents:
         delta = datetime.datetime.now() - datetime.datetime.fromtimestamp(project[5])
         lines.append('- {}{} -> {} ({})'.format(
             '+'.join(json.loads(project[10]).keys()), 
@@ -28,25 +42,35 @@ def do_attend():
             '{}d{}h'.format(delta.days, int(delta.seconds / 3600))
         ))
     part1 = '**当前审核任务**\n\n' + '\n'.join(lines) if lines else '**当前无审核任务**'
-    logger.info('currents: {}'.format('<p>'.join(lines)))
-
-    # 12小时没有动作的情况下跳过信息输出
-    if not lines and (datetime.datetime.now().timestamp() - mysql.t_history.pop()[6] > 28800):
-        logger.debug('skipped output')
-        return
-
-    # Part 2: 分配队列
-    queue = mysql.t_user.pop(count=5)
+    # 钉钉分配队列
     part2 = '**分配队列**\n\n' + '\n'.join([
         '1. {}{}'.format(
             row[1],
             ' (+{})'.format(row[5]) if row[5] else ''
         ) for row in queue
     ])
-    logger.info('queue: {}'.format(queue))
-
-    # 发送card通知
     dingtalk.send_action_card(part1+'\n\n---\n\n'+part2, to_stdout=var.debug)
+
+    # 微信个人通知
+    for idx, item in enumerate(queue):
+        if item[4] == -1:
+            status = '(跳过1篇)'
+        elif item[4] == 0:
+            status = '空闲'
+        elif item[4] == 1:
+            status = '不审加急'
+        elif item[4] == 2:
+            status = '不审报告'
+        else:
+            status = '未知'
+        content = '===== 状态通知 =====\n\n你的状态: {}\n你的分配顺位: {}{}'.format(
+            status, 
+            idx + 1 if item[4] != -1 else 'x', 
+            ' (+{}页)'.format(item[5]) if item[5] else ''
+        )
+        if currents_group_by_user_id[item[0]]:
+            content += '\n你当前有{}个审核任务:\n'.format(item[6]) + '\n'.join(currents_group_by_user_id[item[0]])
+        wxwork.send_text(content, to=[item[0]], to_stdout=var.debug)
 
 
 def do_mail(keywords:dict=None, from_file:str=''):
