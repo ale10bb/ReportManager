@@ -150,80 +150,36 @@ def pop(count:int=1, excludes:list=None, urgent:bool=False, hide_busy:bool=True)
 
     selectResults = []
     with Connection() as (cnx, cursor):
-        if urgent:
-            # 选择未审核紧急报告的审核人，按工作量（当前报告、总页数）排序
-            # 选择status=0的审核人
-            cursor.execute('''
-                SELECT id, name, phone, role, status, (pages - min_pages) AS pages_diff, IFNULL(r.current, 0) AS current
-                FROM user LEFT JOIN (
+        # 选择审核人，按工作量（当前报告、当前页数）排序
+        cursor.execute('''
+            SELECT id, name, phone, role, IF(
+                    id = (
+                        SELECT latest_history.reviewerid
+                        FROM (SELECT reviewerid, end FROM history ORDER BY id DESC LIMIT 1) AS latest_history
+                        WHERE NOT EXISTS (SELECT 1 FROM current WHERE current.start > latest_history.end AND current.reviewerid != '')
+                    ), -1, status
+                ) AS status, (
+                    pages - (SELECT MIN(pages) AS min_pages FROM user WHERE user.available = 1 AND user.role = 1)
+                ) AS pages_diff, IFNULL(current, 0) AS current
+            FROM user LEFT JOIN (
                     SELECT reviewerid, COUNT(1) AS current
                     FROM current
                     GROUP BY reviewerid 
-                ) AS r ON id = reviewerid, (SELECT MIN(pages) AS min_pages FROM user WHERE available = 1 AND role = 1) AS _
-                WHERE user.available = 1 AND user.role = 1 AND user.status = 0 AND NOT EXISTS(
-                    SELECT reviewerid FROM current WHERE reviewerid = user.id AND urgent = 1
-                ) AND user.id NOT IN (
-                    SELECT latest_history.reviewerid
-                    FROM (SELECT reviewerid, end FROM history ORDER BY id DESC LIMIT 1) AS latest_history
-                    WHERE NOT EXISTS (SELECT 1 FROM current WHERE current.start > latest_history.end AND current.reviewerid != '') 
-                )
-                ORDER BY r.current, user.pages
-            ''')
-            logger.debug(cursor.statement)
-            cnx.commit()
-            selectResults = cursor.fetchall()
-
-        # 选择审核人，按工作量（当前报告、当前页数）排序
-        # 如果所有人都有加急报告，则fallback到普通情况。因此在urgent情况之后，也拼接普通情况的结果
-        cursor.execute('''
-            SELECT id, name, phone, role, status, (pages - min_pages) AS pages_diff, IFNULL(r.current, 0) AS current
-            FROM user LEFT JOIN (
-                SELECT reviewerid, COUNT(1) AS current
-                FROM current
-                GROUP BY reviewerid 
-            ) AS r ON id = reviewerid, (SELECT MIN(pages) AS min_pages FROM user WHERE available = 1 AND role = 1) AS _
-            WHERE user.available = 1 AND user.role = 1 AND (user.status = 0 OR user.status = 1) AND user.id NOT IN (
-                SELECT latest_history.reviewerid
-                FROM (SELECT reviewerid, end FROM history ORDER BY id DESC LIMIT 1) AS latest_history
-                WHERE NOT EXISTS (SELECT 1 FROM current WHERE current.start > latest_history.end AND current.reviewerid != '') 
-            )
-            ORDER BY r.current, user.pages
+                ) AS temp_count ON user.id = temp_count.reviewerid
+            WHERE available = 1 AND role = 1
+            ORDER BY current, pages_diff
         ''')
         logger.debug(cursor.statement)
         cnx.commit()
-        # 拼接时进行去重操作
-        # 此处需要使用有序列表，无法使用set去重
-        selectResults.extend([i for i in cursor.fetchall() if i not in selectResults])
-        # 如果设置了显示忙碌状态的用户，则在列表最后分别拼接status=2及临时跳过(status=-1)的用户
-        if not hide_busy:
-            cursor.execute('''
-                SELECT id, name, phone, role, status, (pages - min_pages) AS pages_diff, IFNULL(r.current, 0) AS current
-                FROM user LEFT JOIN (
-                    SELECT reviewerid, COUNT(1) AS current
-                    FROM current
-                    GROUP BY reviewerid 
-                ) AS r ON id = reviewerid , (SELECT MIN(pages) AS min_pages FROM user WHERE available = 1 AND role = 1) AS _
-                WHERE user.available = 1 AND user.role = 1 AND (user.status = 2)
-                UNION SELECT id, name, phone, role, -1, IFNULL(r.current, 0) AS current
-                FROM user
-                LEFT JOIN (
-                    SELECT reviewerid, COUNT(1) AS current
-                    FROM current
-                    GROUP BY reviewerid 
-                ) AS r ON id = reviewerid 
-                WHERE user.id = (
-	                SELECT latest_history.reviewerid
-	                FROM (SELECT reviewerid, end FROM history ORDER BY id DESC LIMIT 1) AS latest_history
-	                WHERE NOT EXISTS (SELECT 1 FROM current WHERE current.start > latest_history.end)
-                )
-            ''')
-            logger.debug(cursor.statement)
-            cnx.commit()
-            # 拼接时进行去重操作
-            selectResults.extend([i for i in cursor.fetchall() if i not in selectResults])
-        # 去除排除列表中的ID
-        # 无法使用set，理由同上
-        selectResults = [i for i in selectResults if i[0] not in excludes]
+        selectResults = cursor.fetchall()
+
+    selectResults = [item for item in selectResults if item[0] not in excludes]
+    if urgent:
+        # 提升status=0(空闲)的审核人优先级
+        selectResults = [item for item in selectResults if item[4] == 0] + [item for item in selectResults if item[4] != 0]
+    if hide_busy:
+        # 仅筛选列表中status=0和status=1的审核人
+        selectResults = [item for item in selectResults if item[4] == 0 or item[4] == 1]
 
     logger.debug('return: {}'.format(selectResults[0:count]))
     return selectResults[0:count]
