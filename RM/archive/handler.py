@@ -78,32 +78,44 @@ def archive(work_path:str, name:str='') -> str:
     assert os.path.isdir(work_path), 'invalid arg: work_path'
     assert type(name) == str, 'invalid arg: name'
 
-    abspath_archive = os.path.join(work_path, name + '.rar') if name else os.path.join(work_path, os.path.basename(work_path) + '.rar')
-    if sys.platform == 'win32':
-        p = subprocess.run([
-            var.bin_path['winrar'],
-            'a',                    # archive
-            '-ep',                  # 忽略目录结构
-            '-hp' + var.password,   # 同时加密文件头
-            '-r',                   # recursive
-            '-xraw.eml',            # 忽略邮件元数据
-            abspath_archive,
-            os.path.join(work_path, '*')
-        ], check=True, capture_output=True)
-        logger.debug('winrar output:\n {}'.format(p.stdout.decode('utf-8')))
-    if sys.platform == 'linux':
-        p = subprocess.run([
-            var.bin_path['rar'],
-            'a',                    # archive
-            '-ep',                  # 忽略目录结构
-            '-hp' + var.password,   # 同时加密文件头
-            '-r',                   # recursive
-            '-xraw.eml',            # 忽略邮件元数据
-            abspath_archive,
-            os.path.join(work_path, '*')
-        ], check=True, capture_output=True)
-        logger.debug('rar output:\n {}'.format(p.stdout.decode('utf-8')))
-
+    archive_name = name + '.rar' if name else os.path.basename(work_path) + '.rar'
+    abspath_archive = os.path.join(work_path, archive_name)
+    # 在1核2G的云服务器时，rar有概率报错退出 (exit 2: 发生致命错误)
+    # 猜测原因为OOM，多次尝试应该会减少错误概率
+    for idx in range(3):
+        logger.debug('attempt {}'.format(idx + 1))
+        if sys.platform == 'win32':
+            p = subprocess.run([
+                var.bin_path['winrar'],
+                'a',                    # archive
+                '-ep',                  # 忽略目录结构
+                '-hp' + var.password,   # 同时加密文件头
+                '-r',                   # recursive
+                '-xraw.eml',            # 忽略邮件元数据
+                '-x' + archive_name,    # 忽略处理报错但可能产生的临时文件
+                abspath_archive,
+                os.path.join(work_path, '*')
+            ], capture_output=True)
+            logger.debug('winrar output ({}):\n {}'.format(p.returncode, p.stdout.decode('utf-8')))
+        elif sys.platform == 'linux':
+            p = subprocess.run([
+                var.bin_path['rar'],
+                'a',                    # archive
+                '-ep',                  # 忽略目录结构
+                '-hp' + var.password,   # 同时加密文件头
+                '-r',                   # recursive
+                '-xraw.eml',            # 忽略邮件元数据
+                '-x' + archive_name,    # 忽略处理报错但可能产生的临时文件
+                abspath_archive,
+                os.path.join(work_path, '*')
+            ], capture_output=True)
+            logger.debug('rar output ({}):\n {}'.format(p.returncode, p.stdout.decode('utf-8')))
+        else:
+            raise OSError('Unsupported platform')
+        if not p.returncode:
+            break
+    else:
+        p.check_returncode()
     logger.debug('return: {}'.format(abspath_archive))
     return abspath_archive
 
