@@ -120,7 +120,7 @@ def extract(work_path:str) -> list:
         list: 解压失败压缩包的绝对路径
 
     Raises:
-        TypeError: 如果参数类型非法
+        AssertionError: 如果参数类型非法
     '''
     logger = logging.getLogger(__name__)
     logger.debug('args: {}'.format({'work_path': work_path}))
@@ -129,9 +129,10 @@ def extract(work_path:str) -> list:
     # rar错误日志
     log_file_path = os.path.join(work_path, 'rar.log')
     # 所有压缩文件路径
-    archive_file_paths = file_paths(filtered_walk(work_path, included_files=['*.rar', '*.zip', '*.7z', '*.tar']))
+    archive_file_paths = list(file_paths(filtered_walk(work_path, included_files=['*.rar', '*.zip', '*.7z', '*.tar'])))
     # 解压所有文件
     for archive_file_path in archive_file_paths:
+        logger.debug('extracting "{}"'.format(archive_file_path))
         if sys.platform == 'win32':
             p = subprocess.run([
                 var.bin_path['winrar'],
