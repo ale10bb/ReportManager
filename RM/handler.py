@@ -417,17 +417,19 @@ def main_queue(q:multiprocessing.Queue):
         # 默认阻塞当前进程，直到队列中出现可用的对象
         item = q.get()
         logger.debug('new item "{}"'.format(item['command']))
-        if item['command'] == 'attend':
-            do_attend()
-            do_clean()
-            mysql.t_user.reset_status()
-        elif item['command'] == 'mail':
-            do_mail(item['kwargs'])
-        elif item['command'] == 'resend':
-            do_resend(item['kwargs']['target'], item['kwargs']['to'])
-        else:
+        try:
+            if item['command'] == 'attend':
+                do_attend()
+                do_clean()
+                mysql.t_user.reset_status()
+            elif item['command'] == 'mail':
+                do_mail(item['kwargs'])
+            elif item['command'] == 'resend':
+                do_resend(item['kwargs']['target'], item['kwargs']['to'])
+            else:
+                pass
+        except:
             pass
-
 
 # def do_notify_archive():
 #     ''' 向项目组长发送提醒归档的邮件。
