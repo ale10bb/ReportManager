@@ -138,67 +138,41 @@ def extract(work_path:str) -> list:
     logger.debug('args: {}'.format({'work_path': work_path}))
     assert os.path.isdir(work_path), 'invalid arg: work_path'
 
-    # rar错误日志
-    log_file_path = os.path.join(work_path, 'rar.log')
-    # 所有压缩文件路径
-    archive_file_paths = list(file_paths(filtered_walk(work_path, included_files=['*.rar', '*.zip', '*.7z', '*.tar'])))
+    # 解压失败的压缩文件路径
+    archives_with_error = []
     # 解压所有文件
-    for archive_file_path in archive_file_paths:
-        logger.debug('extracting "{}"'.format(archive_file_path))
+    for item in file_paths(filtered_walk(work_path, included_files=['*.rar', '*.zip', '*.7z', '*.tar'])):
+        logger.debug('extracting "{}"'.format(item))
         if sys.platform == 'win32':
             p = subprocess.run([
                 var.bin_path['winrar'],
                 'e',                        # 解压到当前文件夹(忽略目录结构)
                 '-p' + var.password,        # '-p'只是传入一个密码，如果压缩包没有加密，则依然解压成功
                 '-o+',                      # overwrite all
-                '-ilog' + log_file_path,    # 将错误信息写入日志文件(utf-16le)
                 '-inul',                    # 不显示默认的错误信息框
-                archive_file_path,
+                item,
                 work_path
-            ], check=True, capture_output=True)
-            logger.debug('winrar output:\n {}'.format(p.stdout.decode('utf-8')))
-        if sys.platform == 'linux':
-            if os.path.splitext(archive_file_path)[1] == '.rar':
-                p = subprocess.run([
-                    var.bin_path['unrar'],
-                    'e',                        # 解压到当前文件夹(忽略目录结构)
-                    '-p' + var.password,        # '-p'只是传入一个密码，如果压缩包没有加密，则依然解压成功
-                    '-o+',                      # overwrite all
-                    '-ilog' + log_file_path,    # 将错误信息写入日志文件(utf-16le)
-                    '-inul',                    # 不显示默认的错误信息框
-                    archive_file_path,
-                    work_path
-                ], check=True, capture_output=True)
-                logger.debug('unrar output:\n {}'.format(p.stdout.decode('utf-8')))
-            else:
-                p = subprocess.run([
-                    var.bin_path['unar'],   
-                    '-D',                       # 忽略目录结构
-                    '-e', 'gbk',                # （文件头不包含unicode信息时）使用gbk编码
-                    '-p', var.password,         # '-p'只是传入一个密码，如果压缩包没有加密，则依然解压成功
-                    '-f',                       # overwrite all
-                    '-o', work_path,            # 输出目录
-                    archive_file_path
-                ], check=True, capture_output=True)
-                logger.debug('unar output:\n {}'.format(p.stdout.decode('utf-8')))
-    # 所有文件解压完后，检查错误日志
-    # 解压失败的压缩文件路径
-    archive_file_paths_with_error = []
-    if os.path.exists(log_file_path):
-        for line in open(log_file_path, 'r', encoding='utf-16le').readlines():
-            # rar的log只记录错误日志，每个文件用分隔符隔离
-            if '--------' in line:
-                #暂存错误文件的列表
-                archive_file_paths_with_error.append(os.path.abspath(line.split('Archive', 1)[1].strip()))
-        # 处理完后无需保留日志
-        os.remove(log_file_path)
-        logger.warning('extraction failed: {}'.format(archive_file_paths_with_error))
+            ], capture_output=True)
+            logger.debug('winrar output ({}):\n {}'.format(p.returncode, p.stdout.decode('utf-8')))
+        elif sys.platform == 'linux':
+            p = subprocess.run([
+                var.bin_path['unar'],   
+                '-D',                       # 忽略目录结构
+                '-e', 'gbk',                # （文件头不包含unicode信息时）使用gbk编码
+                '-p', var.password,         # '-p'只是传入一个密码，如果压缩包没有加密，则依然解压成功
+                '-f',                       # overwrite all
+                '-o', work_path,            # 输出目录
+                item
+            ], capture_output=True)
+            logger.debug('unar output ({}):\n {}'.format(p.returncode, p.stdout.decode('utf-8')))
+        else:
+            raise OSError('Unsupported platform')
+        # 删除解压正常的压缩包
+        if p.returncode:
+            archives_with_error.append(item)
+        else:
+            os.remove(item)
+            logger.debug('removed "{}"'.format(item))   
 
-    # 删除解压正常的压缩包
-    for archive_file_path in archive_file_paths:
-        if archive_file_path not in archive_file_paths_with_error:
-            os.remove(archive_file_path)
-            logger.debug('removed "{}"'.format(archive_file_path))
-
-    logger.debug('return: {}'.format(archive_file_paths_with_error))
-    return archive_file_paths_with_error
+    logger.debug('return: {}'.format(archives_with_error))
+    return archives_with_error
