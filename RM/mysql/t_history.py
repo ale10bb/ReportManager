@@ -1,6 +1,5 @@
 # -*- coding: UTF-8 -*-
 import logging
-import json
 from .connector import Connection
 
 # -------------------------------------
@@ -35,44 +34,17 @@ def search(code:str='', name:str='', company:str='', author_id:str='') -> dict:
 
     ret = {'all': []}
     with Connection() as (cnx, cursor):
-        inputCodes = set(code.split('+'))
-        tempIds = set()
-        validIds = []
-        # 分割输入的code，并依次从history中模糊搜索
-        for inputCode in inputCodes:
-            cursor.execute('''
-                SELECT id, JSON_KEYS(names)
-                FROM history 
-                WHERE names LIKE %s AND names LIKE %s AND company LIKE %s AND authorid LIKE %s 
-                ''', ('%{}%'.format(inputCode), '%{}%'.format(name), '%{}%'.format(company), '%{}%'.format(author_id))
-            )
-            logger.debug(cursor.statement)
-            cnx.commit()
-            tempIds.update(cursor.fetchall())
-
-        # 针对每一个搜索结果，检查输入code是否为搜索结果的子集
-        # 由于需要使用模糊查询，不能使用set自带的判断方式
-        for row in tempIds:
-            # 子集判断
-            # 任意一节输入code不在搜索结果里，就不是子集
-            isSubSet = True
-            for inputCode in inputCodes:
-                if not inputCode in '+'.join(json.loads(row[1])):
-                    isSubSet = False
-                    break
-            if isSubSet:
-                validIds.append(row[0])
-        logger.debug('validIds: {}'.format(validIds))
-
-        # 查询有效数据的内容字段
+        inputCodes = set(['%{}%'.format(item) for item in code.split('+')])
+        codes_condition = ' AND '.join(['JSON_SEARCH(JSON_KEYS(names), \'one\', %s) IS NOT NULL'] * len(inputCodes)) + ' AND '
         cursor.execute('''
             SELECT h.id, u_a.id, u_a.name, u_r.id, u_r.name, UNIX_TIMESTAMP(h.start), UNIX_TIMESTAMP(h.end), h.pages, h.urgent, h.company, h.names
             FROM history h
             LEFT JOIN user u_a ON h.authorid = u_a.id
             LEFT JOIN user u_r ON h.reviewerid = u_r.id 
-            WHERE h.id MEMBER OF(%s)
+            WHERE {}JSON_SEARCH(names, 'one', %s) IS NOT NULL AND company LIKE %s AND authorid LIKE %s 
             ORDER BY h.id DESC
-            ''', (str(sorted(validIds, reverse=True)).replace('\'','"'),)
+            LIMIT 20
+            '''.format(codes_condition), (list(inputCodes) + ['%{}%'.format(name), '%{}%'.format(company), '%{}%'.format(author_id)])
         )
         logger.debug(cursor.statement)
         cnx.commit()
