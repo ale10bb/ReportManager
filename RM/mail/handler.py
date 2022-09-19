@@ -198,7 +198,7 @@ def send(user_id:str, subject:str, content:str='', attachment:str='', needs_cc:b
             assert var.mail_config['large_attachment_handler'], 'large_attachment_handler not set.'
             with open(attachment,'rb') as f:
                 files = {'attachment': f}
-                r = requests.post(var.mail_config['large_attachment_handler'], files=files, timeout=60).json()
+                r = requests.post(var.mail_config['large_attachment_handler'], files=files, timeout=600).json()
                 assert not r['result'], r['err']
                 mail['content_text'] += (
                     '\r\n==== 警告 ====\r\n'
