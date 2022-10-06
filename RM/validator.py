@@ -289,7 +289,7 @@ def read_document(work_path:str) -> dict:
                     break
             # 从表格中读取委托单位
             for row in document.tables[0].rows:
-                if '委托单位' in row.cells[0].text:
+                if '单位' in row.cells[0].text and not '测评单位' in row.cells[0].text:
                     company = row.cells[1].text.strip()
                     break
         ## PRO和PST
