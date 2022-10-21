@@ -336,6 +336,38 @@ def edit_current():
         return ret, status_code
 
 
+@app.route('/api2/current/delete', methods=['POST'])
+def delete_current():
+    ret = {'result': 0, 'err': '', 'data': {}}
+    try:
+        request_body = {}
+        request_body.update(request.json)
+        assert 'id' in request_body, '缺少必要参数<id>'
+        RM.mysql.t_current.delete(request_body['id'], 0, force=True)
+        status_code = 200
+    except BadRequest as err:
+        ret['result'] = 1
+        ret['err'] = '{}'.format(err)
+        status_code = 400
+    except (AssertionError,) as err:
+        ret['result'] = 2
+        ret['err'] = '{}'.format(err)
+        status_code = 500
+    except Exception as err:
+        ret['result'] = 3
+        ret['err'] = '{}'.format(err)
+        status_code = 500
+    finally:
+        RM.mysql.t_audit.add(
+            get_client_ip(request),
+            request.headers.get('User-Agent'),
+            request.path,
+            request_body,
+            ret
+        )
+        return ret, status_code
+
+
 @app.route('/api2/user/list', methods=['POST'])
 def list_user():
     ret = {'result': 0, 'err': '', 'data': {'user': []}}
