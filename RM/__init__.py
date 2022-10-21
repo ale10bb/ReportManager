@@ -5,7 +5,6 @@ import os
 import logging, logging.config
 from configparser import ConfigParser
 import requests
-from multiprocessing import Process, SimpleQueue
 from . import mysql, mail, archive, dingtalk, wxwork
 from . import var
 from .handler import do_attend, do_mail, do_resend
@@ -164,7 +163,3 @@ if dedicate_win32_to_test:
     except:
         logger.warning('invalid dedicate_win32', exc_info=True)
         var.dedicate_win32 = ''
-
-# ---主消息队列---
-var.q = SimpleQueue()
-Process(target=main_queue, args=(var.q,)).start()

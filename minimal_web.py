@@ -5,9 +5,13 @@ import datetime
 import chinese_calendar
 import json
 import RM
+from multiprocessing import Process
 
 app = Flask(__name__)
 app.config['JSON_AS_ASCII'] = False
+# ---主消息队列---
+p = Process(target=RM.main_queue, args=(RM.var.q,))
+p.start()
 
 
 def get_client_ip(request):
@@ -17,6 +21,10 @@ def get_client_ip(request):
 
 @app.route('/api/cron', methods=['GET', 'POST'])
 def cron():
+    global p
+    if not p.is_alive():
+        p = Process(target=RM.main_queue, args=(RM.var.q,))
+        p.start()
     ret = {'result': 0, 'err': '', 'data': {}}
     try:
         cron_type = request.args['type']
@@ -47,6 +55,10 @@ def cron():
 
 @app.route('/api/mail', methods=['POST'])
 def mail():
+    global p
+    if not p.is_alive():
+        p = Process(target=RM.main_queue, args=(RM.var.q,))
+        p.start()
     ret = {'result': 0, 'err': '', 'data': {}}
     try:
         request_body = {}
@@ -84,6 +96,10 @@ def mail():
 
 @app.route('/api/attend', methods=['POST'])
 def attend():
+    global p
+    if not p.is_alive():
+        p = Process(target=RM.main_queue, args=(RM.var.q,))
+        p.start()
     ret = {'result': 0, 'err': '', 'data': {}}
     try:
         request_body = {}
@@ -115,6 +131,10 @@ def attend():
 
 @app.route('/api/history/resend', methods=['POST'])
 def resend_history():
+    global p
+    if not p.is_alive():
+        p = Process(target=RM.main_queue, args=(RM.var.q,))
+        p.start()
     ret = {'result': 0, 'err': '', 'data': {}}
     try:
         request_body = {}
@@ -154,6 +174,10 @@ def resend_history():
 
 @app.route('/api/current/resend', methods=['POST'])
 def resend_current():
+    global p
+    if not p.is_alive():
+        p = Process(target=RM.main_queue, args=(RM.var.q,))
+        p.start()
     ret = {'result': 0, 'err': '', 'data': {}}
 
     try:

@@ -406,12 +406,12 @@ def do_clean():
 
 
 def main_queue(q:multiprocessing.Queue):
-    ''' 消息队列运行在独立的进程中，确保同时只有一个主逻辑运行。
+    ''' 消息队列建议运行在独立的进程中，确保同时只有一个主逻辑运行。
 
     入队列item定义为{'command': xxx, 'kwargs': {xxx}}
     '''
     logger = logging.getLogger(__name__)
-    logger.info('queue inited')
+    logger.info('queue inited (PID: {})'.format(os.getpid()))
 
     while True:
         # 默认阻塞当前进程，直到队列中出现可用的对象
