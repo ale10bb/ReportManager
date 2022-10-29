@@ -92,14 +92,16 @@ pop3_config = {
     'password': config.get('pop3', 'pass', fallback='rm'), 
     'host': config.get('pop3', 'host', fallback='example.com'), 
     'port': config.getint('pop3', 'port', fallback=110),
-    'ssl': config.getboolean('pop3', 'ssl', fallback=False)
+    'ssl': config.getboolean('pop3', 'ssl', fallback=False),
+    'tls': config.getboolean('pop3', 'tls', fallback=False),
 }
 smtp_config = {
     'username': config.get('smtp', 'user', fallback='rm@example.com'), 
     'password': config.get('smtp', 'pass', fallback='rm'), 
     'host': config.get('smtp', 'host', fallback='example.com'), 
     'port': config.getint('smtp', 'port', fallback=25),
-    'ssl': config.getboolean('smtp', 'ssl', fallback=False)
+    'ssl': config.getboolean('smtp', 'ssl', fallback=False),
+    'tls': config.getboolean('smtp', 'tls', fallback=False),
 }
 mail_config = {
     'default_domain': config.get('mail', 'domain', fallback='example.com'),

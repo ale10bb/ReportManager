@@ -12,8 +12,8 @@ def init(pop3_config:dict={}, smtp_config:dict={}, mail_config:dict={}):
     ''' 初始化mail的配置
 
     Args:
-        pop3_config(dict): 需包含'username'、'password'、'host'、'port'、'ssl'
-        smtp_config(dict): 需包含'username'、'password'、'host'、'port'、'ssl'
+        pop3_config(dict): 需包含'username'、'password'、'host'、'port'、'ssl'、'tls'
+        smtp_config(dict): 需包含'username'、'password'、'host'、'port'、'ssl'、'tls'
         mail_config(dict): 需包含'default_domain'、'default_cc'、'max_attachments_size'、'large_attachment_handler'
 
     Raises:
@@ -28,6 +28,7 @@ def init(pop3_config:dict={}, smtp_config:dict={}, mail_config:dict={}):
         pop_host=pop3_config.setdefault('host', 'example.com'), 
         pop_port=pop3_config.setdefault('port', 110),
         pop_ssl=pop3_config.setdefault('ssl', False),
+        pop_tls=pop3_config.setdefault('tls', False),
     ).pop_able(), 'Failed to login POP3 Server.'
     var.pop3_config = pop3_config
     logger.info('POP3 configration ({}) confirmed.'.format(pop3_config['username']))
@@ -39,6 +40,7 @@ def init(pop3_config:dict={}, smtp_config:dict={}, mail_config:dict={}):
         smtp_host=smtp_config.setdefault('host', 'example.com'), 
         smtp_port=smtp_config.setdefault('port', 110),
         smtp_ssl=smtp_config.setdefault('ssl', False),
+        smtp_tls=smtp_config.setdefault('tls', False),
     ).smtp_able(), 'Failed to login SMTP Server.'
     var.smtp_config = smtp_config
     logger.info('SMTP configration ({}) confirmed.'.format(smtp_config['username']))
@@ -97,6 +99,7 @@ def receive(temp_path:str, keywords:dict=None, eml_path:str='') -> list:
             pop_host=var.pop3_config['host'], 
             pop_port=var.pop3_config['port'],
             pop_ssl=var.pop3_config['ssl'],
+            pop_tls=var.pop3_config['tls'],
         )
         logger.debug('pop_able: {}'.format(pop3_server.pop_able()))
 
@@ -188,6 +191,7 @@ def send(user_id:str, subject:str, content:str='', attachment:str='', needs_cc:b
         smtp_host=var.smtp_config['host'], 
         smtp_port=var.smtp_config['port'],
         smtp_ssl=var.smtp_config['ssl'],
+        smtp_tls=var.smtp_config['tls'],
     )
     logger.debug('smtp_able: {}'.format(smtp_server.smtp_able()))
 

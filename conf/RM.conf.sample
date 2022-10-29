@@ -154,6 +154,7 @@ user            =   rm
 pass            =   rm
 port            =   465
 ssl             =   true
+tls             =   false
 
 [pop3]
 #  POP3服务器的登录信息
@@ -163,3 +164,4 @@ user            =   rm
 pass            =   rm
 port            =   995
 ssl             =   true
+tls             =   false
