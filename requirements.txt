@@ -1,5 +1,5 @@
 Flask
-zmail
+https://github.com/ale10bb/zmail/archive/refs/tags/v0.2.8.1.tar.gz
 walkdir
 python-docx
 mysql-connector-python
