@@ -1,27 +1,40 @@
-FROM python:3.11-slim
-
-# set TZ to Asia/Shanghai by default
-ENV TZ=Asia/Shanghai
-RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
-
-# environments for RM
-WORKDIR /ReportManager
-RUN mkdir storage storage/archive storage/temp && touch storage/RM.log
-VOLUME [ "/ReportManager/storage" ]
+FROM registry.cn-hongkong.aliyuncs.com/ale10bb/python:3.11-web-flask
 
 # requirements for RM
-RUN apt-get update && apt-get install -y curl unar && \
-    curl -o rarlinux-x64-612.tar.gz https://www.rarlab.com/rar/rarlinux-x64-612.tar.gz && \
-    tar -xf rarlinux-x64-612.tar.gz -C /opt && rm rarlinux-x64-612.tar.gz && \
-    curl -o /etc/rarreg.key https://gist.githubusercontent.com/MuhammadSaim/de84d1ca59952cf1efaa8c061aab81a1/raw/ca31cbda01412e85949810d52d03573af281f826/rarreg.key && \
-    ln -s /opt/rar/unrar /usr/bin/unrar && ln -s /opt/rar/rar /usr/bin/rar && \
-    apt-get autoremove -y curl && rm -rf /var/lib/apt/lists/*
-RUN pip install --no-cache-dir Flask gunicorn[gevent] walkdir python-docx mysql-connector-python DBUtils DingtalkChatbot chinesecalendar && \
-    pip install --no-cache-dir https://github.com/ale10bb/zmail/archive/refs/tags/v0.2.8.1.tar.gz
-COPY RM RM
-COPY minimal_web.py minimal_web.py
-COPY template template
+RUN set -eux; \
+        \
+        savedAptMark="$(apt-mark showmanual)"; \
+        apt-get update; \
+        apt-get install -y --no-install-recommends wget; \
+        \
+        wget -O rarlinux-x64-612.tar.gz https://www.rarlab.com/rar/rarlinux-x64-612.tar.gz; \
+        wget -O /etc/rarreg.key https://gist.githubusercontent.com/MuhammadSaim/de84d1ca59952cf1efaa8c061aab81a1/raw/ca31cbda01412e85949810d52d03573af281f826/rarreg.key; \
+        tar -xf rarlinux-x64-612.tar.gz -C /opt; \
+        ln -s /opt/rar/unrar /usr/bin/unrar; \
+        ln -s /opt/rar/rar /usr/bin/rar; \
+        rm rarlinux-x64-612.tar.gz; \
+        \
+        apt-mark auto '.*' > /dev/null; \
+        [ -z "$savedAptMark" ] || apt-mark manual $savedAptMark > /dev/null; \
+        apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false; \
+        apt-get install -y --no-install-recommends unar; \
+        rm -rf /var/lib/apt/lists/*; \
+        \
+        pip install --no-cache-dir walkdir python-docx mysql-connector-python DBUtils DingtalkChatbot chinesecalendar; \
+        pip install --no-cache-dir https://github.com/ale10bb/zmail/archive/refs/tags/v0.2.8.1.tar.gz
 
-COPY res/docker-entrypoint.sh /docker-entrypoint.sh
+# directory structure for RM
+WORKDIR /ReportManager
+RUN set -eux; \
+        mkdir storage; \
+        mkdir storage/archive; \
+        mkdir storage/temp; \
+        touch storage/RM.log
+VOLUME [ "/ReportManager/storage" ]
+COPY RM RM
+COPY minimal_web.py .
+COPY template template
+COPY res/docker-entrypoint.sh /
+
 ENTRYPOINT ["/docker-entrypoint.sh"]
 CMD [ "main" ]
