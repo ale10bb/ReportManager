@@ -199,7 +199,7 @@ def do_mail(keywords:dict=None, from_file:str=''):
 
             ## 去除所有子目录结构
             for file_path in file_paths(filtered_walk(attachments_path, min_depth=1)):
-                shutil.move(file_path, attachments_path)
+                shutil.copy(file_path, attachments_path)
             for dir_path in dir_paths(filtered_walk(attachments_path, min_depth=1, depth=1)):
                 shutil.rmtree(dir_path)
 
