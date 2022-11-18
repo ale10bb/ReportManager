@@ -93,6 +93,7 @@ def archive(work_path:str, name:str='') -> str:
                 '-r',                   # recursive
                 '-xraw.eml',            # 忽略邮件元数据
                 '-x' + archive_name,    # 忽略处理报错但可能产生的临时文件
+                '-o+',                  # overwrite all
                 abspath_archive,
                 os.path.join(work_path, '*')
             ], capture_output=True)
@@ -106,6 +107,7 @@ def archive(work_path:str, name:str='') -> str:
                 '-r',                   # recursive
                 '-xraw.eml',            # 忽略邮件元数据
                 '-x' + archive_name,    # 忽略处理报错但可能产生的临时文件
+                '-o+',                  # overwrite all
                 abspath_archive,
                 os.path.join(work_path, '*')
             ], capture_output=True)
@@ -141,7 +143,7 @@ def extract(work_path:str) -> list:
     # 解压失败的压缩文件路径
     archives_with_error = []
     # 解压所有文件
-    for item in file_paths(filtered_walk(work_path, included_files=['*.rar', '*.zip', '*.7z', '*.tar'])):
+    for item in file_paths(filtered_walk(work_path, included_files=['*.rar', '*.zip', '*.zipx', '*.7z'])):
         logger.debug('extracting "{}"'.format(item))
         if sys.platform == 'win32':
             p = subprocess.run([
@@ -155,16 +157,29 @@ def extract(work_path:str) -> list:
             ], capture_output=True)
             logger.debug('winrar output ({}):\n {}'.format(p.returncode, p.stdout.decode('utf-8')))
         elif sys.platform == 'linux':
-            p = subprocess.run([
-                var.bin_path['unar'],   
-                '-D',                       # 忽略目录结构
-                '-e', 'gbk',                # （文件头不包含unicode信息时）使用gbk编码
-                '-p', var.password,         # '-p'只是传入一个密码，如果压缩包没有加密，则依然解压成功
-                '-f',                       # overwrite all
-                '-o', work_path,            # 输出目录
-                item
-            ], capture_output=True)
-            logger.debug('unar output ({}):\n {}'.format(p.returncode, p.stdout.decode('utf-8')))
+            match os.path.splitext(item)[1]:
+                case '.rar':
+                    p = subprocess.run([
+                        var.bin_path['unrar'],
+                        'e',                        # 解压到当前文件夹(忽略目录结构)
+                        '-p' + var.password,        # '-p'只是传入一个密码，如果压缩包没有加密，则依然解压成功
+                        '-o+',                      # overwrite all
+                        '-inul',                    # 不显示默认的错误信息框
+                        item,
+                        work_path
+                    ], capture_output=True)
+                    logger.debug('unrar output ({}):\n {}'.format(p.returncode, p.stdout.decode('utf-8')))
+                case _:
+                    p = subprocess.run([
+                        var.bin_path['unar'],   
+                        '-D',                       # 忽略目录结构
+                        '-e', 'gbk',                # （文件头不包含unicode信息时）使用gbk编码
+                        '-p', var.password,         # '-p'只是传入一个密码，如果压缩包没有加密，则依然解压成功
+                        '-f',                       # overwrite all
+                        '-o', work_path,            # 输出目录
+                        item
+                    ], capture_output=True)
+                    logger.debug('unar output ({}):\n {}'.format(p.returncode, p.stdout.decode('utf-8')))
         else:
             raise OSError('Unsupported platform')
         # 删除解压正常的压缩包
