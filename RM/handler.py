@@ -110,33 +110,37 @@ def do_mail(keywords:dict=None, from_file:str=''):
             # 提交审核时，生成XT13
             if check_results['operator'] == 'submit':
                 for code in check_results['attachment']['codes']:
-                    logger.info('generating XT13 for "{}"'.format(code))
-                    # 根据项目编号读取不同的审核意见单模板
-                    if 'PRO' in code or 'PST' in code:
-                        template_document = Document(os.path.join('template', 'RD-XT13测评报告审核、签发意见单-PROPST.docx'))
-                    elif 'SOF' in code:
-                        template_document = Document(os.path.join('template', 'RD-XT13测评报告审核、签发意见单-SOF.docx'))
-                    elif 'DSYS' in code:
-                        template_document = Document(os.path.join('template', 'RD-XT13测评报告审核、签发意见单-DSYS.docx'))
-                    elif 'SRV' in code:
-                        template_document = Document(os.path.join('template', 'RD-XT13测评报告审核、签发意见单-SRV.docx'))
-                    elif 'PER' in code:
-                        template_document = Document(os.path.join('template', 'RD-XT13测评报告审核、签发意见单-PER.docx'))
-                    elif 'FUN' in code:
-                        template_document = Document(os.path.join('template', 'RD-XT13测评报告审核、签发意见单-FUN.docx'))
-                    else:
-                        # 目前无视其他类型的报告
-                        continue 
+                    try:
+                        logger.info('generating XT13 for "{}"'.format(code))
+                        # 根据项目编号读取不同的审核意见单模板
+                        if 'PRO' in code or 'PST' in code:
+                            template_document = Document(os.path.join('template', 'RD-XT13测评报告审核、签发意见单-PROPST.docx'))
+                        elif 'SOF' in code:
+                            template_document = Document(os.path.join('template', 'RD-XT13测评报告审核、签发意见单-SOF.docx'))
+                        elif 'DSYS' in code:
+                            template_document = Document(os.path.join('template', 'RD-XT13测评报告审核、签发意见单-DSYS.docx'))
+                        elif 'SRV' in code:
+                            template_document = Document(os.path.join('template', 'RD-XT13测评报告审核、签发意见单-SRV.docx'))
+                        elif 'PER' in code:
+                            template_document = Document(os.path.join('template', 'RD-XT13测评报告审核、签发意见单-PER.docx'))
+                        elif 'FUN' in code:
+                            template_document = Document(os.path.join('template', 'RD-XT13测评报告审核、签发意见单-FUN.docx'))
+                        else:
+                            # 目前无视其他类型的报告
+                            continue 
 
-                    # 项目编号(bold)
-                    template_document.paragraphs[0].add_run(code).bold = True
-                    # 项目名称
-                    template_document.tables[0].cell(1, 1).text = check_results['attachment']['names'].get(code, '')
-                    # 报告撰写人
-                    template_document.tables[0].cell(2, 1).text = check_results['content']['name']
+                        # 项目编号(bold)
+                        template_document.paragraphs[0].add_run(code).bold = True
+                        # 项目名称
+                        template_document.tables[0].cell(1, 1).text = check_results['attachment']['names'].get(code, '')
+                        # 报告撰写人
+                        template_document.tables[0].cell(2, 1).text = check_results['content']['name']
 
-                    # 另存为
-                    template_document.save(os.path.join(attachments_path, 'RD-XT13测评报告审核、签发意见单{}.docx'.format(code)))
+                        # 另存为
+                        template_document.save(os.path.join(attachments_path, 'RD-XT13测评报告审核、签发意见单{}.docx'.format(code)))
+                    except Exception as err:
+                        logger.warning('generating XT13 failed: {}'.format(err))
+                        check_results['warnings'].append('generating XT13 failed for "{}"'.format(code))
 
             # 完成审核时，删除多余文件
             if check_results['operator'] == 'finish':

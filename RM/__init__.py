@@ -154,7 +154,7 @@ logger.info('---- Initiating dedicate_win32 ----')
 dedicate_win32_to_test = config.get('dedicate', 'win32', fallback='')
 if dedicate_win32_to_test:
     try:
-        with open(os.path.join('template', 'test_win32.doc'),'rb') as f:
+        with open(os.path.join('res', 'test_win32.doc'),'rb') as f:
             files = {'document': f}
             r = requests.post(dedicate_win32_to_test, files=files, timeout=60).json()
         assert not r['result'], r['err']

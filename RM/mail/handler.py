@@ -54,7 +54,7 @@ def init(pop3_config:dict={}, smtp_config:dict={}, mail_config:dict={}):
     logger.info('max_attachments_size: {}'.format(mail_config['max_attachments_size']))
     if mail_config.setdefault('large_attachment_handler', ''):
         try:
-            with open(os.path.join('template', 'test_win32.doc'),'rb') as f:
+            with open(os.path.join('res', 'test_win32.doc'),'rb') as f:
                 files = {'attachment': f}
                 r = requests.post(mail_config['large_attachment_handler'], files=files, timeout=60).json()
             assert not r['result'], r['err']

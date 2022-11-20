@@ -33,8 +33,7 @@ RUN set -eux; \
 VOLUME [ "/ReportManager/storage" ]
 COPY RM RM
 COPY minimal_web.py .
-COPY template template
-COPY res/docker-entrypoint.sh /
+COPY res res
 
-ENTRYPOINT ["/docker-entrypoint.sh"]
+ENTRYPOINT ["/ReportManager/res/docker-entrypoint.sh"]
 CMD [ "main" ]
