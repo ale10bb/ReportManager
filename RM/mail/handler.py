@@ -58,8 +58,9 @@ def init(pop3_config:dict={}, smtp_config:dict={}, mail_config:dict={}):
                 files = {'attachment': f}
                 r = requests.post(mail_config['large_attachment_handler'], files=files, timeout=60).json()
             assert not r['result'], r['err']
-            assert r['data']['name'] == 'test_win32.doc'
-            assert requests.head(r['data']['url']).status_code == 200
+            assert len(r['data']) == 1
+            assert r['data'][0]['name'] == 'test_win32.doc'
+            assert requests.head(r['data'][0]['url']).status_code == 200
             logger.info('large_attachment_handler: {}'.format(mail_config['large_attachment_handler']))
         except:
             logger.warning('invalid arg: mail_config.large_attachment_handler', exc_info=True)
