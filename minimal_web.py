@@ -125,7 +125,7 @@ def resend_current():
 def search_history():
     g.ret['data']['history'] = []
     kwargs = {}
-    for key, value in request.json:
+    for key, value in request.json.items():
         if key in ['code', 'name', 'company']:
             kwargs[key] = value
         elif key == 'author':
@@ -139,7 +139,6 @@ def search_history():
     return g.ret
 
 
-
 @app.route('/api2/current/list', methods=['POST'])
 def list_current():
     g.ret['data']['current'] = []
@@ -148,6 +147,7 @@ def list_current():
         g.ret['data']['current'].append(dict(zip(keys, row)))
         g.ret['data']['current'][-1]['names'] = json.loads(g.ret['data']['current'][-1]['names'])
     return g.ret
+
 
 @app.route('/api2/current/edit', methods=['POST'])
 def edit_current():
