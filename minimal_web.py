@@ -176,33 +176,30 @@ def delete_current():
 def list_user():
     g.ret['data']['user'] = []
     assert type(request.json.get('isReviewer', False)) == bool, '无效参数<isReviewer>'
-    keys = ['id', 'name', 'phone', 'role', 'status']
+    keys = ['id', 'name', 'role', 'status']
     for row in RM.mysql.t_user.search(only_reviewer=request.json.get('isReviewer', False))['user']:
-        g.ret['data']['user'].append(dict(zip(keys, row)))
-        g.ret['data']['user'][-1]['phone'] = ''
+        g.ret['data']['user'].append(dict(zip(keys, [row[0], row[1], row[3], row[4]])))
     return g.ret
 
 
 @app.route('/api2/user/search', methods=['POST'])
 def search_user():
     g.ret['data']['user'] = []
-    keys = ['id', 'name', 'phone', 'role', 'status']
+    keys = ['id', 'name', 'role', 'status']
     for row in RM.mysql.t_user.search(
         user_id=request.json.get('id', ''),
         name=request.json.get('name', ''),
     )['user']:
-        g.ret['data']['user'].append(dict(zip(keys, row)))
-        g.ret['data']['user'][-1]['phone'] = ''
+        g.ret['data']['user'].append(dict(zip(keys, [row[0], row[1], row[3], row[4]])))
     return g.ret
 
 
 @app.route('/api2/queue/list', methods=['POST'])
 def list_queue():
-    g.ret['data'] = {'normal': [], 'urgent': [], 'exclude': []}
-    keys = ['id', 'name', 'phone', 'role', 'status', 'pages_diff', 'current']
-    for row in RM.mysql.t_user.pop(count=9999, urgent=False, hide_busy=False):
-        g.ret['data']['normal'].append(dict(zip(keys, row)))
-        g.ret['data']['normal'][-1]['phone'] = ''
+    g.ret['data']['queue'] = []
+    keys = ['id', 'name', 'role', 'status', 'pages_diff', 'current', 'skipped']
+    for row in RM.mysql.t_user.pop(count=9999, hide_busy=False):
+        g.ret['data']['queue'].append(dict(zip(keys, row)))
     return g.ret
 
 

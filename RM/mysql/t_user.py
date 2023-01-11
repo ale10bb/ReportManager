@@ -132,11 +132,11 @@ def pop(count:int=1, excludes:list=None, urgent:bool=False, hide_busy:bool=True)
     Args:
         count(int): 需要获取的审核人数量（可选/默认值1）；
         excludes(list): 排除的审核人ID（可选/默认值[]）；
-        urgent(bool): 是否排除status=1及status=2（可选/默认值False）；
+        urgent(bool): 是否降权status=1（可选/默认值False）；
         hide_busy(bool): 是否隐藏status=2（可选/默认值True）；
 
     Returns:
-        [(id, name, phone, role, status, pages_diff, current), ...]：长度为{count}的审核人ID元组列表，每个元组包括用户信息和当前报告数量（长度不超过审核人总数）
+        [(id, name, role, status, pages_diff, current, skipped), ...]：长度为{count}的审核人ID元组列表，每个元组包括用户信息和当前报告数量（长度不超过审核人总数）
 
     Raises:
         AssertionError: 如果参数类型非法
@@ -151,23 +151,24 @@ def pop(count:int=1, excludes:list=None, urgent:bool=False, hide_busy:bool=True)
     selectResults = []
     with Connection() as (cnx, cursor):
         # 选择审核人，按工作量（当前报告、当前页数）排序
+        # 前一个完成审核的人赋予skipped参数，默认降权到最后一个
         cursor.execute('''
-            SELECT id, name, phone, role, IF(
+            SELECT id, name, role, status, (
+                    pages - (SELECT MIN(pages) AS min_pages FROM user WHERE user.available = 1 AND user.role = 1)
+                ) AS pages_diff, IFNULL(current, 0) AS current, IF(
                     id = (
                         SELECT latest_history.reviewerid
                         FROM (SELECT reviewerid, end FROM history ORDER BY id DESC LIMIT 1) AS latest_history
                         WHERE NOT EXISTS (SELECT 1 FROM current WHERE current.start > latest_history.end AND current.reviewerid != '')
-                    ), -1, status
-                ) AS status, (
-                    pages - (SELECT MIN(pages) AS min_pages FROM user WHERE user.available = 1 AND user.role = 1)
-                ) AS pages_diff, IFNULL(current, 0) AS current
+                    ), 1, 0
+                ) AS skipped
             FROM user LEFT JOIN (
                     SELECT reviewerid, COUNT(1) AS current
                     FROM current
                     GROUP BY reviewerid 
                 ) AS temp_count ON user.id = temp_count.reviewerid
             WHERE available = 1 AND role = 1
-            ORDER BY current, pages_diff
+            ORDER BY skipped, current, pages_diff
         ''')
         logger.debug(cursor.statement)
         cnx.commit()
@@ -176,10 +177,10 @@ def pop(count:int=1, excludes:list=None, urgent:bool=False, hide_busy:bool=True)
     selectResults = [item for item in selectResults if item[0] not in excludes]
     if urgent:
         # 提升status=0(空闲)的审核人优先级
-        selectResults = [item for item in selectResults if item[4] == 0] + [item for item in selectResults if item[4] != 0]
+        selectResults = [item for item in selectResults if item[3] == 0] + [item for item in selectResults if item[3] != 0]
     if hide_busy:
         # 仅筛选列表中status=0和status=1的审核人
-        selectResults = [item for item in selectResults if item[4] == 0 or item[4] == 1]
+        selectResults = [item for item in selectResults if item[3] == 0 or item[3] == 1]
 
     logger.debug('return: {}'.format(selectResults[0:count]))
     return selectResults[0:count]
