@@ -236,7 +236,10 @@ def edit(current_id:str, **kwargs):
             logger.debug('urgent: {} -> {}'.format(ret[8], kwargs['urgent']))
             # 如果已有审核人，修改其pages
             if ret[3]:
-                modified_pages_kwargs = int(kwargs['pages'] * 1.5) if kwargs['urgent'] else kwargs['pages']
+                if 'pages' in kwargs.keys():
+                    modified_pages_kwargs = int(kwargs['pages'] * 1.5) if kwargs['urgent'] else kwargs['pages']
+                else:
+                    modified_pages_kwargs = int(ret[7] * 1.5) if kwargs['urgent'] else ret[7]
                 cursor.execute('''
                     UPDATE user 
                     SET pages = pages + %s
