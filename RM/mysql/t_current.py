@@ -11,7 +11,7 @@ from . import t_user
 # 注：仅可由命令逻辑调用，默认参数均为合法
 #     不进行commit操作
 
-def search(code:str='', user_id:str='') -> dict:
+def search(code:str='', user_id:str='', page_index:int=1, page_size:int=10) -> dict:
     ''' 搜索current表中的项目。
 
     1. 按照code模糊查询current中的所有项目，写入ret['all']；支持按“+”分割传入多个code，查询结果包含code的超集；
@@ -21,9 +21,11 @@ def search(code:str='', user_id:str='') -> dict:
     Args:
         code(str): 项目编号（可选/默认值空）
         user_id(str): 用户ID（精确查询）（可选/默认值空）
+        page_index(int): 分页/当前页（可选/默认值1）
+        page_size(int): 分页/页大小（可选/默认值10）
 
     Returns:
-        {"all": [], "submit": [], "review": []}
+        {"all": [], "submit": [], "review": [], 'total': int}
 
     Raises:
         AssertionError: 如果参数类型非法
@@ -32,18 +34,31 @@ def search(code:str='', user_id:str='') -> dict:
     logger.debug('args: {}'.format({'code': code, 'user_id': user_id}))
     assert type(code) == str, 'invalid arg: code'
     assert type(user_id) == str, 'invalid arg: user_id'
+    assert type(page_index) == int, 'invalid arg: page_index'
+    assert type(page_size) == int, 'invalid arg: page_size'
 
-    ret = {'all': [], 'submit': [], 'review': []}
+    ret = {'all': [], 'submit': [], 'review': [], 'total': 0}
     with Connection() as (cnx, cursor):
         inputCodes = set(['%{}%'.format(item) for item in code.split('+')])
         codes_condition = ' AND '.join(['JSON_SEARCH(JSON_KEYS(names), \'one\', %s) IS NOT NULL'] * len(inputCodes))
+        cursor.execute('''
+            SELECT count(1) FROM current WHERE {}
+            '''.format(codes_condition), (list(inputCodes))
+        )
+        logger.debug(cursor.statement)
+        cnx.commit()
+        ret['total'] = cursor.fetchone()[0]
         cursor.execute('''
             SELECT c.id, u_a.id, u_a.name, u_r.id, u_r.name, UNIX_TIMESTAMP(c.start), null, c.pages, c.urgent, c.company, c.names
             FROM current c
             LEFT JOIN user u_a ON c.authorid = u_a.id
             LEFT JOIN user u_r ON c.reviewerid = u_r.id 
             WHERE {}
-            '''.format(codes_condition), (list(inputCodes))
+            LIMIT %s OFFSET %s
+            '''.format(codes_condition), (list(inputCodes)+ [
+                page_size, 
+                page_size * (page_index - 1)
+            ])
         )
         logger.debug(cursor.statement)
         cnx.commit()

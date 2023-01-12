@@ -17,7 +17,7 @@ def do_attend():
     logger = logging.getLogger(__name__)
     
     # 准备通知所需数据
-    currents = mysql.t_current.search()['all']
+    currents = mysql.t_current.search(page_size=9999)['all']
     # 24小时没有动作的情况下跳过信息输出
     if not currents and (datetime.datetime.now().timestamp() - mysql.t_history.pop()[6] > 86400):
         logger.debug('skipped output')
@@ -53,20 +53,18 @@ def do_attend():
 
     # 微信个人通知
     for idx, item in enumerate(queue):
-        if item[4] == -1:
-            status = '(跳过1篇)'
-        elif item[4] == 0:
+        if item[3] == 0:
             status = '空闲'
-        elif item[4] == 1:
+        elif item[3] == 1:
             status = '不审加急'
-        elif item[4] == 2:
+        elif item[3] == 2:
             status = '不审报告'
         else:
             status = '未知'
         content = '===== 状态通知 =====\n\n你的状态: {}\n你的分配顺位: {}{}'.format(
             status, 
-            idx + 1 if item[4] != -1 else 'x', 
-            ' (+{}页)'.format(item[5]) if item[5] else ''
+            idx + 1 if item[6] == 0 else '跳过一篇', 
+            ' (+{}页)'.format(item[4]) if item[4] else ''
         )
         if currents_group_by_user_id[item[0]]:
             content += '\n你当前有{}个审核任务:\n'.format(item[6]) + '\n'.join(currents_group_by_user_id[item[0]])

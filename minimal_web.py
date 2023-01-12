@@ -132,10 +132,16 @@ def search_history():
             user_ids = RM.mysql.t_user.search(name=request.json['author'])['user'] + RM.mysql.t_user.search(user_id=request.json['author'])['user']
             if len(user_ids) == 1:
                 kwargs['author_id'] = user_ids[0][0]
+        elif key == 'current':
+            kwargs['page_index'] = value
+        elif key == 'pageSize':
+            kwargs['page_size'] = value
     keys = ['id', 'author_id', 'author_name', 'reviewer_id', 'reviewer_name', 'start', 'end', 'page', 'urgent', 'company', 'names']
-    for row in RM.mysql.t_history.search(**kwargs)['all']:
+    ret = RM.mysql.t_history.search(**kwargs)
+    for row in ret['all']:
         g.ret['data']['history'].append(dict(zip(keys, row)))
         g.ret['data']['history'][-1]['names'] = json.loads(g.ret['data']['history'][-1]['names'])
+    g.ret['data']['total'] = ret['total']
     return g.ret
 
 
@@ -143,9 +149,11 @@ def search_history():
 def list_current():
     g.ret['data']['current'] = []
     keys = ['id', 'author_id', 'author_name', 'reviewer_id', 'reviewer_name', 'start', 'end', 'page', 'urgent', 'company', 'names']
-    for row in RM.mysql.t_current.search()['all']:
+    ret = RM.mysql.t_current.search(page_size=9999)
+    for row in ret['all']:
         g.ret['data']['current'].append(dict(zip(keys, row)))
         g.ret['data']['current'][-1]['names'] = json.loads(g.ret['data']['current'][-1]['names'])
+    g.ret['data']['total'] = ret['total']
     return g.ret
 
 

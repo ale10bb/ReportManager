@@ -7,7 +7,7 @@ from .connector import Connection
 # -------------------------------------
 # 注：仅可由命令逻辑调用，默认参数均为合法
 
-def search(code:str='', name:str='', company:str='', author_id:str='') -> dict:
+def search(code:str='', name:str='', company:str='', author_id:str='', page_index:int=1, page_size:int=10) -> dict:
     ''' 搜索history表中的项目。
 
     1. 按照code模糊查询history中的所有项目，写入ret['all']；支持按“+”分割传入多个code，查询结果包含code的超集；
@@ -18,9 +18,11 @@ def search(code:str='', name:str='', company:str='', author_id:str='') -> dict:
         name(str): 项目名称（可选/默认值空）
         company(str): 委托单位（可选/默认值空）
         author_id(str): 作者ID（可选/默认值空）
+        page_index(int): 分页/当前页（可选/默认值1）
+        page_size(int): 分页/页大小（可选/默认值10）
 
     Returns:
-        {'all': []}
+        {'all': [], 'total': int}
 
     Raises:
         AssertionError: 如果参数类型非法
@@ -31,11 +33,22 @@ def search(code:str='', name:str='', company:str='', author_id:str='') -> dict:
     assert type(name) == str, 'invalid arg: name'
     assert type(company) == str, 'invalid arg: company'
     assert type(author_id) == str, 'invalid arg: author_id'
+    assert type(page_index) == int, 'invalid arg: page_index'
+    assert type(page_size) == int, 'invalid arg: page_size'
 
-    ret = {'all': []}
+    ret = {'all': [], 'total': 0}
     with Connection() as (cnx, cursor):
         inputCodes = set(['%{}%'.format(item) for item in code.split('+')])
         codes_condition = ' AND '.join(['JSON_SEARCH(JSON_KEYS(names), \'one\', %s) IS NOT NULL'] * len(inputCodes)) + ' AND '
+        cursor.execute('''
+            SELECT count(1) FROM history WHERE {}JSON_SEARCH(names, 'one', %s) IS NOT NULL AND company LIKE %s AND authorid LIKE %s
+            '''.format(codes_condition), (
+                list(inputCodes) + ['%{}%'.format(name), '%{}%'.format(company), '%{}%'.format(author_id)]
+            )
+        )
+        logger.debug(cursor.statement)
+        cnx.commit()
+        ret['total'] = cursor.fetchone()[0]
         cursor.execute('''
             SELECT h.id, u_a.id, u_a.name, u_r.id, u_r.name, UNIX_TIMESTAMP(h.start), UNIX_TIMESTAMP(h.end), h.pages, h.urgent, h.company, h.names
             FROM history h
@@ -43,8 +56,14 @@ def search(code:str='', name:str='', company:str='', author_id:str='') -> dict:
             LEFT JOIN user u_r ON h.reviewerid = u_r.id 
             WHERE {}JSON_SEARCH(names, 'one', %s) IS NOT NULL AND company LIKE %s AND authorid LIKE %s 
             ORDER BY h.id DESC
-            LIMIT 20
-            '''.format(codes_condition), (list(inputCodes) + ['%{}%'.format(name), '%{}%'.format(company), '%{}%'.format(author_id)])
+            LIMIT %s OFFSET %s
+            '''.format(codes_condition), (list(inputCodes) + [
+                '%{}%'.format(name), 
+                '%{}%'.format(company), 
+                '%{}%'.format(author_id),
+                page_size,
+                page_size * (page_index - 1)
+            ])
         )
         logger.debug(cursor.statement)
         cnx.commit()
