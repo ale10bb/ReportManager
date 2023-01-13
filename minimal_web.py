@@ -217,3 +217,9 @@ def user_status():
     assert 'status' in request.json, '缺少必要参数<status>'
     RM.mysql.t_user.set_status(request.json['id'], request.json['status'])
     return g.ret
+
+
+if __name__ == "__main__":
+    from flask_cors import CORS
+    CORS(app, resources={r"*": {"origins": "*"}})
+    app.run(debug=True)
