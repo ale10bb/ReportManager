@@ -7,12 +7,12 @@ RUN set -eux; \
         apt-get update; \
         apt-get install -y --no-install-recommends wget; \
         \
-        wget -O rarlinux-x64-612.tar.gz https://www.rarlab.com/rar/rarlinux-x64-612.tar.gz; \
+        wget -O rarlinux-x64-620.tar.gz https://www.rarlab.com/rar/rarlinux-x64-620.tar.gz; \
         wget -O /etc/rarreg.key https://gist.githubusercontent.com/MuhammadSaim/de84d1ca59952cf1efaa8c061aab81a1/raw/ca31cbda01412e85949810d52d03573af281f826/rarreg.key; \
-        tar -xf rarlinux-x64-612.tar.gz -C /opt; \
+        tar -xf rarlinux-x64-620.tar.gz -C /opt; \
         ln -s /opt/rar/unrar /usr/bin/unrar; \
         ln -s /opt/rar/rar /usr/bin/rar; \
-        rm rarlinux-x64-612.tar.gz; \
+        rm rarlinux-x64-620.tar.gz; \
         \
         apt-mark auto '.*' > /dev/null; \
         [ -z "$savedAptMark" ] || apt-mark manual $savedAptMark > /dev/null; \
