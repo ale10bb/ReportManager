@@ -67,7 +67,7 @@ def do_attend():
             ' (+{}页)'.format(item[4]) if item[4] else ''
         )
         if currents_group_by_user_id[item[0]]:
-            content += '\n你当前有{}个审核任务:\n'.format(item[6]) + '\n'.join(currents_group_by_user_id[item[0]])
+            content += '\n你当前有{}个审核任务:\n'.format(item[5]) + '\n'.join(currents_group_by_user_id[item[0]])
         wxwork.send_text(content, to=[item[0]], to_stdout=var.debug)
 
 
