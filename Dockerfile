@@ -8,7 +8,7 @@ RUN set -eux; \
         rm -rf /var/lib/apt/lists/*; \
         \
         pip install --no-cache-dir walkdir python-docx mysql-connector-python DBUtils DingtalkChatbot chinesecalendar; \
-        pip install --no-cache-dir https://github.com/ale10bb/zmail/archive/refs/tags/v0.2.8.1.tar.gz
+        pip install --no-cache-dir https://github.com/ale10bb/zmail/archive/refs/tags/v0.2.8.2.tar.gz
 
 # directory structure for RM
 WORKDIR /ReportManager
