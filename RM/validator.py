@@ -1,14 +1,11 @@
 # -*- coding: UTF-8 -*-
 import os
 import logging
-import sys
 import argparse
 import re
 from email.utils import parseaddr
 from walkdir import filtered_walk, file_paths
-from docx import Document
 import requests
-import base64
 from . import archive, mail, mysql
 from . import var
 
@@ -201,142 +198,18 @@ def read_document(work_path:str) -> dict:
     document_paths = file_paths(filtered_walk(work_path, included_files=['*.doc', '*.docx'], excluded_files=['~$*', '*XT13*', '*签发意见单*']))
     for document_path in document_paths:
         logger.info('reading "{}"'.format(os.path.basename(document_path)))
-        # 初始化读取变量
-        page = 30
-        company = ''
-        code = ''
-        name = ''
-        
-        # 尝试转换文件及读取页数
-        try:
-            if sys.platform == 'win32':
-                import win32com.client, pythoncom
-                pythoncom.CoInitialize()
-                word = win32com.client.gencache.EnsureDispatch('Word.Application')
-                document = word.Documents.Open(FileName=document_path)
-                logger.debug('compatibility mode: {}'.format(document.CompatibilityMode))
-                # 将word转换为最新文件格式
-                if document.CompatibilityMode < 15: # CompatibilityMode=11-14(旧版)
-                    document.Convert()
-                    document.Save()
-                    document_path = os.path.splitext(document_path)[0] + '.docx'
-                    logger.info('converted to latest compatibility mode')
-                # 读取文档页数
-                page = document.ComputeStatistics(2) # wdStatisticPages=2
-                logger.info('page: {}'.format(page))
-                document.Close(SaveChanges=0)
-                pythoncom.CoUninitialize()
-            else:
-                assert var.dedicate_win32, 'win32_handler not set'
-                with open(document_path,'rb') as f:
-                    files = {'document': f}
-                    r = requests.post(var.dedicate_win32, files=files, timeout=60).json()
-                assert not r['result'], r['err']
-                page = r['data']['page']
-                logger.info('page: {}'.format(page))
-                if r['data']['converted']['name']:
-                    logger.info('converted to latest compatibility mode')
-                    os.remove(document_path)
-                    with open(os.path.join(os.path.dirname(document_path), r['data']['converted']['name']), 'wb') as f:
-                        f.write(base64.b64decode(r['data']['converted']['content'].encode('utf-8')))
-                    document_path = os.path.join(os.path.dirname(document_path), r['data']['converted']['name'])
-        except:
-            logger.error('win32_handler error', exc_info=True)
+        assert var.dedicate_win32, 'win32_handler not set'
+        with open(document_path,'rb') as f:
+            files = {'document': f}
+            r = requests.post(var.dedicate_win32, files=files, timeout=120).json()
+        assert not r['result'], r['err']
+        logger.info('data: {}'.format(r['data']))
+        page = r['data']['page']
+        company = r['data']['company']
+        code = r['data']['code']
+        name = r['data']['name']
 
-        # 调python-docx读取信息
-        # 如果读取失败，直接跳过
-        try:
-            document = Document(document_path)
-        except:
-            logger.error('ignored document', exc_info=True)
-            continue
-        
-        # 读项目编号
-        ## 印象中所有项目编号都能在前几行读到
-        for paragraph in document.paragraphs[0:5]:
-            re_result = re.search('SHTEC20[0-9]{2}(PRO|PST|DSYS|SOF|SRV|PER|FUN)[0-9]{4}([-_][0-9]+){0,1}', paragraph.text)
-            if re_result:
-                code = re_result[0]
-                break
-        logger.info('code: {}'.format(code))
-        ## 读不到项目编号时，忽略该文档
-        if not code:
-            logger.warning('ignored document')
-            continue
-
-        # 特别地，附件和复核意见单不把编号和名称写入ret，但计算页数
-        flag = False
-        ## 注：以下所有[0:30]表示读取封面页，但最多读取文档的前30行
-        ## 考虑到“正常”页边距的一页文档可包含40行5号字段落，且封面页一定不会塞满40行5号字，因此读到30行就认为超过了封面
-        for paragraph in document.paragraphs[0:30]:
-            # 检测封面是否包含这两种文档的关键词
-            if re.search('附 {0,10}件', paragraph.text) or re.search('复核意见表', paragraph.text):
-                flag = True
-                break
-        if flag:
-            logger.info('ignored but counted pages')
-            ret['pages'] = ret['pages'] + page
-            continue
-
-        # 读取系统名称和委托单位
-        ## 等保报告
-        if 'DSYS' in code:
-            logger.debug('reading DSYS')
-            # 系统名称在封面页的表格外面
-            for paragraph in document.paragraphs[0:30]:
-                if '等级测评报告' in paragraph.text:
-                    name = paragraph.text.split('等级测评报告', 1)[0].strip()
-                    break
-            # 从表格中读取委托单位
-            for row in document.tables[0].rows:
-                if '单位' in row.cells[0].text and not '测评单位' in row.cells[0].text:
-                    company = row.cells[1].text.strip()
-                    break
-        ## PRO和PST
-        elif 'PRO' in code or 'PST' in code or 'PER' in code:
-            logger.debug('reading PRO/PST/PER')
-            # 直接从第一个表格中读取
-            for row in document.tables[0].rows:
-                if '名称' in row.cells[0].text:
-                    name = row.cells[1].text.strip()
-                if '委托单位' in row.cells[0].text:
-                    company = row.cells[1].text.strip()
-        ## SOF
-        elif 'SOF' in code or 'FUN' in code:
-            logger.debug('reading SOF/FUN')
-            # 遍历第一页的行读取
-            for paragraph in document.paragraphs[0:30]:
-                if '名称' in paragraph.text:
-                    name = re.sub('^.*名称(:|：)', '', paragraph.text).strip()
-                if '委托单位' in paragraph.text:
-                    company = re.sub('^.*单位(:|：)', '', paragraph.text).strip()
-                if name and company:
-                    break
-        ## 其他报告，自求多福
-        else:
-            logger.debug('reading others')
-            name = '<unknown>'
-            # 先尝试读表格
-            for row in document.tables[0].rows:
-                if '名称' in row.cells[0].text:
-                    name = row.cells[1].text.strip()
-                if '委托单位' in row.cells[0].text:
-                    company = row.cells[1].text.strip()
-            # 再尝试读行
-            for paragraph in document.paragraphs[0:30]:
-                if '名称' in paragraph.text:
-                    name = re.sub('^.*名称(:|：)', '', paragraph.text).strip()
-                if '委托单位' in paragraph.text:
-                    company = re.sub('^.*单位(:|：)', '', paragraph.text).strip()
-                if name and company:
-                    break
-
-        # 尝试去除可能存在的换行符
-        name = name.replace('\n', '')
-        company = company.replace('\n', '')
-        logger.info('name: {}'.format(name))
-        logger.info('company: {}'.format(company))
-        # 为了防止“跳过附件和复核意见单失败”的情况，仅读取到有效值后才把编号和名称写入ret
+        # 结果中附加本报告
         if name:
             ret['codes'].append(code)
             ret['names'][code] = name
@@ -368,12 +241,11 @@ def read_XT13(work_path:str) -> dict:
     document_paths = file_paths(filtered_walk(work_path, included_files=['*XT13*.docx', '*签发意见单*.docx'], excluded_files=['~$*']))
     for document_path in document_paths:
         logger.info('reading "{}"'.format(os.path.basename(document_path)))
-        document = Document(document_path)
-        # 从审核意见单第一行读编号
-        re_result = re.search('SHTEC20[0-9]{2}(PRO|PST|DSYS|SOF|SRV|PER|FUN)[0-9]{4}([-_][0-9]+){0,1}', document.paragraphs[0].text)
+        # 仅从文件名读编号
+        re_result = re.search('SHTEC20[0-9]{2}(PRO|PST|DSYS|SOF|SRV|PER|FUN)[0-9]{4}([-_][0-9]+){0,1}', os.path.basename(document_path))
         if re_result:
-            ret['codes'].append(re_result[0])
-        logger.info('code: {}'.format(re_result[0]))
+            ret['codes'].append(re_result.group())
+            logger.info('code: {}'.format(re_result.group()))
                 
     logger.debug('return: {}'.format(ret))
     return ret
