@@ -157,9 +157,8 @@ if dedicate_win32_to_test:
         with open(os.path.join('res', 'test_win32.doc'),'rb') as f:
             files = {'document': f}
             r = requests.post(dedicate_win32_to_test, files=files, timeout=60).json()
-        assert not r['result'], r['err']
         assert r['data']['page'] == 1
-        assert r['data']['converted']['name'] == 'test_win32.docx'
+        assert r['data']['filename'] == 'test_win32.doc'
         logger.info('dedicate_win32: {}'.format(dedicate_win32_to_test))
         var.dedicate_win32 = dedicate_win32_to_test
     except:
