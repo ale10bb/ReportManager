@@ -5,9 +5,10 @@ import argparse
 import re
 from email.utils import parseaddr
 from walkdir import filtered_walk, file_paths
-import requests
+import sys
+if sys.platform == 'win32':
+    import win32com.client
 from . import archive, mail, mysql
-from . import var
 
 # --------------------------------------------
 #           检查邮件及附件的处理逻辑
@@ -196,28 +197,100 @@ def read_document(work_path:str) -> dict:
     ret = {'pages': 0, 'company': '', 'codes': [], 'names': {}}
     # work_path中的所有doc和docx文件视作有效文档，但忽略审核意见单和临时文件
     document_paths = file_paths(filtered_walk(work_path, included_files=['*.doc', '*.docx'], excluded_files=['~$*', '*XT13*', '*签发意见单*']))
+    word = win32com.client.gencache.EnsureDispatch('Word.Application')
     for document_path in document_paths:
         logger.info('reading "{}"'.format(os.path.basename(document_path)))
-        assert var.dedicate_win32, 'win32_handler not set'
-        with open(document_path,'rb') as f:
-            files = {'document': f}
-            r = requests.post(var.dedicate_win32, files=files, timeout=120).json()
-        assert not r['result'], r['err']
-        logger.info('data: {}'.format(r['data']))
-        page = r['data']['page']
-        company = r['data']['company']
-        code = r['data']['code']
-        name = r['data']['name']
+        page = 0
+        code = ''
+        name = ''
+        company = ''
+        try:
+            document = None
+            document = word.Documents.Open(FileName=document_path)
 
-        # 结果中附加本报告
-        if name:
-            ret['codes'].append(code)
-            ret['names'][code] = name
-        # 委托单位有效时覆盖缓存值
-        if company:
-            ret['company'] = company
-        # 累加项目包总页数
-        ret['pages'] = ret['pages'] + page
+            # 读取文档页数
+            page = document.ComputeStatistics(2) # wdStatisticPages=2
+            logger.info('page: {}'.format(page))
+
+            # 读项目编号
+            ## 印象中所有项目编号都能在前几行读到
+            pattern = re.compile('SHTEC20[0-9]{2}(PRO|PST|DSYS|SOF|SRV|PER|FUN)[0-9]{4}([-_][0-9]+){0,1}')
+            for i in range(5):
+                re_result = re.search(pattern, document.Paragraphs(i+1).Range.Text)
+                if re_result:
+                    code = re_result.group()
+                    logger.info('code: {}'.format(code))
+                    break
+            else:
+                logger.warning('ignored document')
+                continue
+
+            # 附件和复核意见单的逻辑已去除
+            
+            # 读取系统名称和委托单位
+            if 'DSYS' in code:
+                logger.debug('reading DSYS')
+                # 系统名称在封面页的表格外面
+                for i in range(30):
+                    paragraph = document.Paragraphs(i+1).Range.Text.strip()
+                    if '等级测评报告' in paragraph:
+                        name = paragraph[:-6]
+                        break
+                # 从表格中读取委托单位
+                company = document.Tables(1).Cell(1, 2).Range.Text
+            elif 'PRO' in code or 'PST' in code or 'PER' in code:
+                logger.debug('reading PRO/PST/PER')
+                # 直接从第一个表格中读取
+                name = document.Tables(1).Cell(1, 2).Range.Text
+                company = document.Tables(1).Cell(2, 2).Range.Text
+            elif 'SOF' in code or 'FUN' in code:
+                logger.debug('reading SOF/FUN')
+                # 遍历第一页的行读取
+                for i in range(30):
+                    paragraph = document.Paragraphs(i+1).Range.Text.strip()
+                    if '名称' in paragraph:
+                        name = re.sub('^.*名称(:|：)', '', paragraph)
+                    if '委托单位' in paragraph:
+                        company = re.sub('^.*单位(:|：)', '', paragraph)
+                    if name and company:
+                        break
+            ## 其他报告，自求多福
+            else:
+                logger.debug('reading others')
+                # 先尝试读表格
+                for i in range(document.Tables(1).Rows.Count):
+                    if '名称' in document.Tables(1).Cell(i+1, 1).Range.Text:
+                        name = document.Tables(1).Cell(i+1, 2).Range.Text
+                    if '委托单位' in document.Tables(1).Cell(i+1, 1).Range.Text:
+                        company = document.Tables(1).Cell(i+1, 2).Range.Text
+                # 再尝试读行
+                for i in range(30):
+                    paragraph = document.Paragraphs(i+1).Range.Text.strip()
+                    if '名称' in paragraph:
+                        name = re.sub('^.*名称(:|：)', '', paragraph)
+                    if '委托单位' in paragraph:
+                        company = re.sub('^.*单位(:|：)', '', paragraph)
+                    if name and company:
+                        break
+
+            # 尝试去除可能存在的换行符
+            if name:
+                name = re.sub('(\r|\n|\x07| *)', '', name)
+                logger.info('name: {}'.format(name))
+                ret['codes'].append(code)
+                ret['names'][code] = name
+            # 委托单位有效时覆盖缓存值
+            if company:
+                company = re.sub('(\r|\n|\x07| *)', '', company)
+                logger.info('company: {}'.format(company))
+                ret['company'] = company
+            # 累加项目包总页数
+            ret['pages'] = ret['pages'] + page 
+        except Exception as err:
+            logger.warning('read failed', exc_info=True)
+        finally:
+            if document:
+                document.Close(SaveChanges=0)
 
     logger.debug('return: {}'.format(ret))
     return ret
