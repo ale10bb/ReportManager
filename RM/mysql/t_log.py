@@ -1,7 +1,7 @@
 # -*- coding: UTF-8 -*-
 import logging
 import json
-from .connector import Connection
+from . import var
 
 # ------------------------------------
 #        log_mail表增删改查逻辑
@@ -24,7 +24,7 @@ def add(check_results:dict, err:str=''):
     assert type(check_results) == dict, 'invalid arg: check_results'
     assert type(err) == str, 'invalid arg: err'
 
-    with Connection() as (cnx, cursor):
+    with var.transaction as cursor:
         cursor.execute('''
             INSERT INTO log_mail (operator, keyword, error, warnings, mail, content, attachment, target, notification, work_path)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
@@ -42,4 +42,3 @@ def add(check_results:dict, err:str=''):
             )
         )
         logger.debug(cursor.statement)
-        cnx.commit()

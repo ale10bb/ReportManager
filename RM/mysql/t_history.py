@@ -1,6 +1,6 @@
 # -*- coding: UTF-8 -*-
 import logging
-from .connector import Connection
+from . import var
 
 # -------------------------------------
 #          histroy增删改查逻辑
@@ -37,7 +37,7 @@ def search(code:str='', name:str='', company:str='', author_id:str='', page_inde
     assert type(page_size) == int, 'invalid arg: page_size'
 
     ret = {'all': [], 'total': 0}
-    with Connection() as (cnx, cursor):
+    with var.transaction as cursor:
         inputCodes = set(['%{}%'.format(item) for item in code.split('+')])
         codes_condition = ' AND '.join(['JSON_SEARCH(JSON_KEYS(names), \'one\', %s) IS NOT NULL'] * len(inputCodes)) + ' AND '
         cursor.execute('''
@@ -47,7 +47,6 @@ def search(code:str='', name:str='', company:str='', author_id:str='', page_inde
             )
         )
         logger.debug(cursor.statement)
-        cnx.commit()
         ret['total'] = cursor.fetchone()[0]
         cursor.execute('''
             SELECT h.id, u_a.id, u_a.name, u_r.id, u_r.name, UNIX_TIMESTAMP(h.start), UNIX_TIMESTAMP(h.end), h.pages, h.urgent, h.company, h.names
@@ -66,7 +65,6 @@ def search(code:str='', name:str='', company:str='', author_id:str='', page_inde
             ])
         )
         logger.debug(cursor.statement)
-        cnx.commit()
         ret['all'] = cursor.fetchall()
 
     logger.debug('return: {}'.format(ret))
@@ -89,7 +87,7 @@ def fetch(history_id:int) -> tuple:
     logger.debug('args: {}'.format({'history_id': history_id}))
     assert type(history_id) == int, 'invalid arg: history_id'
 
-    with Connection() as (cnx, cursor):
+    with var.transaction as cursor:
         cursor.execute('''
             SELECT h.id, u_a.id, u_a.name, u_r.id, u_r.name, UNIX_TIMESTAMP(h.start), UNIX_TIMESTAMP(h.end), h.pages, h.urgent, h.company, h.names
             FROM history h
@@ -99,7 +97,6 @@ def fetch(history_id:int) -> tuple:
             ''', (history_id,)
         )
         logger.debug(cursor.statement)
-        cnx.commit()
         row = cursor.fetchone()
 
     logger.debug('return: {}'.format(row))
@@ -114,7 +111,7 @@ def pop() -> tuple:
     '''
     logger = logging.getLogger(__name__)
 
-    with Connection() as (cnx, cursor):
+    with var.transaction as cursor:
         cursor.execute('''
             SELECT h.id, u_a.id, u_a.name, u_r.id, u_r.name, UNIX_TIMESTAMP(h.start), UNIX_TIMESTAMP(h.end), h.pages, h.urgent, h.company, h.names
             FROM history h
@@ -125,7 +122,6 @@ def pop() -> tuple:
             '''
         )
         logger.debug(cursor.statement)
-        cnx.commit()
         row = cursor.fetchone()
 
     logger.debug('return: {}'.format(row))
@@ -143,7 +139,7 @@ def pop() -> tuple:
 #     # 初始化ret结构
 #     ret = []
 
-#     with Connection() as (cnx, cursor):
+#     with var.transaction as cursor:
 #         cursor.execute('''
 #             SELECT authorid, CAST(
 #                 concat('{', GROUP_CONCAT(SUBSTRING_INDEX(SUBSTR(names,2), '}', 1)), '}')
@@ -154,7 +150,6 @@ def pop() -> tuple:
 #             '''
 #         )
 #         logger.debug(cursor.statement)
-#         cnx.commit()
 #         for row in cursor.fetchall():
 #             ret.append({'authorid': row[0], 'names': json.loads(row[1])})
 

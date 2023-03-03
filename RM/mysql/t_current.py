@@ -2,7 +2,7 @@
 import logging
 import json
 import hashlib
-from .connector import Connection
+from . import var
 from . import t_user
 
 # -------------------------------------
@@ -38,7 +38,7 @@ def search(code:str='', user_id:str='', page_index:int=1, page_size:int=10) -> d
     assert type(page_size) == int, 'invalid arg: page_size'
 
     ret = {'all': [], 'submit': [], 'review': [], 'total': 0}
-    with Connection() as (cnx, cursor):
+    with var.transaction as cursor:
         inputCodes = set(['%{}%'.format(item) for item in code.split('+')])
         codes_condition = ' AND '.join(['JSON_SEARCH(JSON_KEYS(names), \'one\', %s) IS NOT NULL'] * len(inputCodes))
         cursor.execute('''
@@ -46,7 +46,6 @@ def search(code:str='', user_id:str='', page_index:int=1, page_size:int=10) -> d
             '''.format(codes_condition), (list(inputCodes))
         )
         logger.debug(cursor.statement)
-        cnx.commit()
         ret['total'] = cursor.fetchone()[0]
         cursor.execute('''
             SELECT c.id, u_a.id, u_a.name, u_r.id, u_r.name, UNIX_TIMESTAMP(c.start), null, c.pages, c.urgent, c.company, c.names
@@ -61,7 +60,6 @@ def search(code:str='', user_id:str='', page_index:int=1, page_size:int=10) -> d
             ])
         )
         logger.debug(cursor.statement)
-        cnx.commit()
         ret['all'] = cursor.fetchall()
         logger.debug('result: {}'.format(ret['all']))
         # 检查user_id是否在内容字段中
@@ -88,7 +86,7 @@ def fetch(current_id:str) -> tuple:
     logger.debug('args: {}'.format({'current_id': current_id}))
     assert type(current_id) == str, 'invalid arg: current_id'
 
-    with Connection() as (cnx, cursor):
+    with var.transaction as cursor:
         cursor.execute('''
             SELECT c.id, u_a.id, u_a.name, u_r.id, u_r.name, UNIX_TIMESTAMP(c.start), null, c.pages, c.urgent, c.company, c.names
             FROM current c
@@ -98,7 +96,6 @@ def fetch(current_id:str) -> tuple:
             ''', (current_id,)
         )
         logger.debug(cursor.statement)
-        cnx.commit()
         row = cursor.fetchone()
 
     logger.debug('return: {}'.format(row))
@@ -148,14 +145,13 @@ def add(names:dict, company:str, pages:int, urgent:bool, author_id:str, submit_t
     current_id = hashlib.sha256(code.encode('utf-8')).hexdigest()
     logger.debug('current_id: {}'.format(current_id))
 
-    with Connection() as (cnx, cursor):
+    with var.transaction as cursor:
         cursor.execute('''
             INSERT INTO current (id, names, company, pages, urgent, authorid, start)
             VALUES (%s, %s, %s, %s, %s, %s, FROM_UNIXTIME(%s))
             ''', (current_id, json.dumps(names), company, pages, urgent, author_id, submit_timestamp)
         )
         logger.debug(cursor.statement)
-        cnx.commit()
 
     logger.debug('return: {}'.format(current_id))
     return current_id
@@ -185,7 +181,7 @@ def edit(current_id:str, **kwargs):
 
     # 加急报告设置页数的系数
     modified_pages_search = int(ret[7] * 1.5) if ret[8] else ret[7]
-    with Connection() as (cnx, cursor):
+    with var.transaction as cursor:
         if 'reviewerid' in kwargs.keys():
             # 修改审核人
             logger.debug('reviewerid: {} -> {}'.format(ret[3], kwargs['reviewerid']))
@@ -224,7 +220,6 @@ def edit(current_id:str, **kwargs):
                     ''', (-modified_pages_search, ret[3])
                 )
                 logger.debug(cursor.statement)
-            cnx.commit()
         if 'pages' in kwargs.keys():
             # 修改页数
             logger.debug('pages: {} -> {}'.format(ret[7], kwargs['pages']))
@@ -245,7 +240,6 @@ def edit(current_id:str, **kwargs):
                 ''', (kwargs['pages'], ret[0])
             )
             logger.debug(cursor.statement)
-            cnx.commit()
         if 'urgent' in kwargs.keys():
             # 修改加急状态
             logger.debug('urgent: {} -> {}'.format(ret[8], kwargs['urgent']))
@@ -269,7 +263,6 @@ def edit(current_id:str, **kwargs):
                 ''', (kwargs['urgent'], ret[0])
             )
             logger.debug(cursor.statement)
-            cnx.commit()
 
 
 def delete(current_id:str, finish_timestamp:int, force:bool=False):
@@ -293,7 +286,7 @@ def delete(current_id:str, finish_timestamp:int, force:bool=False):
     assert ret, 'invalid arg: current_id'
     assert type(finish_timestamp) == int, 'invalid arg: finish_timestamp'
 
-    with Connection() as (cnx, cursor):
+    with var.transaction as cursor:
         # 删除current记录
         cursor.execute(
             "DELETE FROM current WHERE id = %s", (ret[0],)
@@ -316,7 +309,6 @@ def delete(current_id:str, finish_timestamp:int, force:bool=False):
                 ''', (ret[10], ret[9], ret[7], ret[8], ret[1], ret[3], ret[5], finish_timestamp)
             )
             logger.debug(cursor.statement)
-        cnx.commit()
 
 
 def __contains__(code:str) -> bool:

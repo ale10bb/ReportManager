@@ -1,7 +1,7 @@
 # -*- coding: UTF-8 -*-
 import logging
 import json
-from .connector import Connection
+from . import var
 
 # ------------------------------------
 #       log_manage表增删改查逻辑
@@ -30,7 +30,7 @@ def add(ip:str, user_agent:str, url:str, param:dict, result:dict):
     assert type(param) == dict, 'invalid arg: param'
     assert type(result) == dict, 'invalid arg: result'
 
-    with Connection() as (cnx, cursor):
+    with var.transaction as cursor:
         cursor.execute('''
             INSERT INTO log_manage (ip, user_agent, url, param, result)
             VALUES (INET6_ATON(%s), %s, %s, %s, %s)
@@ -43,4 +43,3 @@ def add(ip:str, user_agent:str, url:str, param:dict, result:dict):
             )
         )
         logger.debug(cursor.statement)
-        cnx.commit()

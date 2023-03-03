@@ -1,3 +1,2 @@
-connector_args = tuple()
-connector_kwargs = dict()
-pool = None
+from .client import Transaction
+transaction = Transaction

@@ -1,6 +1,6 @@
 # -*- coding: UTF-8 -*-
 import logging
-from .connector import Connection
+from . import var
 
 # ------------------------------------
 #          user表增删改查逻辑
@@ -32,7 +32,7 @@ def search(user_id:str='', name:str='', phone:str='', only_reviewer:bool=False) 
     assert type(phone) == str, 'invalid arg: phone'
 
     ret = {'user': []}
-    with Connection() as (cnx, cursor):
+    with var.transaction as cursor:
         if only_reviewer:
             cursor.execute('''
                 SELECT id, name, phone, role, status
@@ -41,7 +41,6 @@ def search(user_id:str='', name:str='', phone:str='', only_reviewer:bool=False) 
                 ''', ('%{}%'.format(user_id), '%{}%'.format(name), '%{}%'.format(phone))
             )
             logger.debug(cursor.statement)
-            cnx.commit()
         else:
             cursor.execute('''
                 SELECT id, name, phone, role, status
@@ -50,7 +49,6 @@ def search(user_id:str='', name:str='', phone:str='', only_reviewer:bool=False) 
                 ''', ('%{}%'.format(user_id), '%{}%'.format(name), '%{}%'.format(phone))
             )
             logger.debug(cursor.statement)
-            cnx.commit()
         ret['user'] = cursor.fetchall()
 
     logger.debug('return: {}'.format(ret))
@@ -73,7 +71,7 @@ def fetch(user_id:str) -> tuple:
     logger.debug('args: {}'.format({'user_id': user_id}))
     assert type(user_id) == str, 'invalid arg: user_id'
 
-    with Connection() as (cnx, cursor):
+    with var.transaction as cursor:
         cursor.execute('''
             SELECT id, name, phone, role, status
             FROM user
@@ -81,7 +79,6 @@ def fetch(user_id:str) -> tuple:
             ''', (user_id,)
         )
         logger.debug(cursor.statement)
-        cnx.commit()
         row = cursor.fetchone()
 
     logger.debug('return: {}'.format(row))
@@ -105,19 +102,17 @@ def __contains__(user_id:str, only_reviewer:bool=False) -> bool:
     logger.debug('args: {}'.format({'user_id': user_id, 'only_reviewer': only_reviewer}))
     assert type(user_id) == str, 'invalid arg: user_id'
     
-    with Connection() as (cnx, cursor):
+    with var.transaction as cursor:
         if only_reviewer:
             cursor.execute(
                 "SELECT 1 FROM user WHERE available = 1 AND role = 1 AND id = %s", (user_id,)
             )
             logger.debug(cursor.statement)
-            cnx.commit()
         else:
             cursor.execute(
                 "SELECT 1 FROM user WHERE available = 1 AND id = %s", (user_id,)
             )
             logger.debug(cursor.statement)
-            cnx.commit()
         row = cursor.fetchone()
     
     logger.debug('return: {}'.format(bool(row)))
@@ -149,7 +144,7 @@ def pop(count:int=1, excludes:list=None, urgent:bool=False, hide_busy:bool=True)
     assert type(excludes) == list, 'invalid arg: excludes'
 
     selectResults = []
-    with Connection() as (cnx, cursor):
+    with var.transaction as cursor:
         # 选择审核人，按工作量（当前报告、当前页数）排序
         # 前一个完成审核的人赋予skipped参数，默认降权到最后一个
         cursor.execute('''
@@ -171,7 +166,6 @@ def pop(count:int=1, excludes:list=None, urgent:bool=False, hide_busy:bool=True)
             ORDER BY skipped, current, pages_diff
         ''')
         logger.debug(cursor.statement)
-        cnx.commit()
         selectResults = cursor.fetchall()
 
     selectResults = [item for item in selectResults if item[0] not in excludes]
@@ -201,7 +195,7 @@ def set_status(user_id:str, status:int):
     assert __contains__(user_id), 'invalid arg: user_id'
     assert status in [0, 1, 2], 'invalid arg: status'
 
-    with Connection() as (cnx, cursor):
+    with var.transaction as cursor:
         cursor.execute('''
             UPDATE user
             SET status = %s, status_since = NOW() 
@@ -209,7 +203,6 @@ def set_status(user_id:str, status:int):
             ''', (status, user_id)
         )
         logger.debug(cursor.statement)
-        cnx.commit()
 
 
 def reset_status(days:int=7):
@@ -225,7 +218,7 @@ def reset_status(days:int=7):
     logger.debug('args: {}'.format({'days': days}))
     assert type(days) == int, 'invalid arg: days'
 
-    with Connection() as (cnx, cursor):
+    with var.transaction as cursor:
         cursor.execute('''
             UPDATE user
             SET status = 0, status_since = NOW() 
@@ -233,4 +226,3 @@ def reset_status(days:int=7):
             ''', (days,)
         )
         logger.debug(cursor.statement)
-        cnx.commit()
