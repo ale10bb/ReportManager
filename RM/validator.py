@@ -8,7 +8,7 @@ from walkdir import filtered_walk, file_paths
 import sys
 if sys.platform == 'win32':
     import win32com.client
-from . import archive, mail, mysql
+from . import mysql
 
 # --------------------------------------------
 #           检查邮件及附件的处理逻辑
@@ -55,7 +55,7 @@ def check_mail_content(mail_content:dict) -> dict:
     else:
         user_id = parseaddr(mail_content['from'])[1].split('@')[0]
 
-    if mail.valid_domain(mail_content['from']) and mysql.t_user.__contains__(user_id):
+    if mysql.t_user.__contains__(user_id):
         name = mysql.t_user.fetch(user_id)[1]
         ret['content']['user_id'] = user_id
         ret['content']['name'] = name
@@ -154,10 +154,6 @@ def check_mail_attachment(work_path:str, operator:str) -> dict:
     assert os.path.isdir(work_path), 'invalid arg: work_path'
 
     ret = {'warnings': [], 'attachment': {}}
-    # 解压工作目录中的所有压缩包，并添加解压失败的告警
-    for archive_file_path_with_error in archive.extract(work_path):
-        ret['warnings'].append('解压失败："{}"'.format(os.path.basename(archive_file_path_with_error)))
-
     # 读取工作目录中的所有文档
     # 传入的操作符用于控制读取逻辑
     # 用返回值的codes参数作为标记，无codes说明读取失败，此时抛出ValueError异常

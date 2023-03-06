@@ -2,13 +2,13 @@
 set -e
 
 if [ "${1:0:1}" = '-' ]; then
-    set -- gunicorn minimal_web:app "$@"
+    set -- gunicorn manage:app "$@"
 fi
-if [ "$1" = 'main' ]; then
+if [ "$1" = 'manage' ]; then
     if ["${@:2}" != ""]; then
-        gunicorn minimal_web:app --worker-class gevent --capture-output --bind :9070 --timeout 120
+        gunicorn manage:app --worker-class gevent --capture-output --bind :9070 --timeout 120
     else
-        gunicorn minimal_web:app ${@:2}
+        gunicorn manage:app ${@:2}
     fi
 else
     exec "$@"
