@@ -94,11 +94,11 @@ def before_first_request():
     # ---wxwork---
     global wxwork
     wxwork = RM.WXWork(
-        config.get('wework', 'corpid', fallback=''),
-        config.get('wework', 'agentid', fallback=''),
-        config.get('wework', 'secret', fallback=''),
-        config.get('wework', 'admin_userid', fallback=''),
-        config.getboolean('wework', 'enable', fallback=False)
+        config.get('wxwork', 'corpid', fallback=''),
+        config.get('wxwork', 'agentid', fallback=''),
+        config.get('wxwork', 'secret', fallback=''),
+        config.get('wxwork', 'admin_userid', fallback=''),
+        config.getboolean('wxwork', 'enable', fallback=False)
     )
 
 
