@@ -156,7 +156,7 @@ def init():
     )
 
 
-def do_mail(check_result:dict=None):
+def do_mail(check_results:dict=None):
     ''' 邮件管理函数的主逻辑，对于传入的单个邮件，依次进行邮件检查、数据库操作、发送通知步骤。
 
     传入的{keywords}用于自定义处理逻辑。
@@ -168,7 +168,7 @@ def do_mail(check_result:dict=None):
         处理邮件数量
     '''
     logger = logging.getLogger(__name__)
-    logger.debug('args: {}'.format({'check_result': check_result}))
+    logger.debug('args: {}'.format({'check_results': check_results}))
 
     logger.info('reading "{}" from "{}"'.format(check_results['operator'], check_results['mail']['from']))
     try:
@@ -510,16 +510,16 @@ if __name__ == "__main__":
         logger.debug('new item "{}"'.format(item['command']))
         try:
             if item['command'] == 'receive':
-                check_results = mail.receive(os.path.join(storage, 'temp'), item['kwargs'])
-                for check_result in check_results:
-                    do_mail(check_result)
+                received_mails = mail.receive(os.path.join(storage, 'temp'), item['kwargs'])
+                for received_mail in received_mails:
+                    do_mail(received_mail)
             elif item['command'] == 'read':
-                check_result = mail.read(
+                check_results = mail.read(
                     os.path.join(storage, 'temp'),
                     item['kwargs']['key'],
                     item['kwargs']['file'],
                 )
-                do_mail(check_result)
+                do_mail(check_results)
             elif item['command'] == 'resend':
                 do_resend(**item['kwargs'])
         except Exception as err:
