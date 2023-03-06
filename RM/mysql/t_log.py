@@ -1,6 +1,7 @@
 # -*- coding: UTF-8 -*-
 import logging
 import json
+from .client import Transaction
 from . import var
 
 # ------------------------------------
@@ -24,7 +25,7 @@ def add(check_results:dict, err:str=''):
     assert type(check_results) == dict, 'invalid arg: check_results'
     assert type(err) == str, 'invalid arg: err'
 
-    with var.transaction as cursor:
+    with Transaction(var.pool) as cursor:
         cursor.execute('''
             INSERT INTO log_mail (operator, keyword, error, warnings, mail, content, attachment, target, notification, work_path)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)

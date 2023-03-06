@@ -1,6 +1,7 @@
 # -*- coding: UTF-8 -*-
 import logging
 import json
+from .client import Transaction
 from . import var
 
 # ------------------------------------
@@ -30,7 +31,7 @@ def add(ip:str, user_agent:str, url:str, param:dict, result:dict):
     assert type(param) == dict, 'invalid arg: param'
     assert type(result) == dict, 'invalid arg: result'
 
-    with var.transaction as cursor:
+    with Transaction(var.pool) as cursor:
         cursor.execute('''
             INSERT INTO log_manage (ip, user_agent, url, param, result)
             VALUES (INET6_ATON(%s), %s, %s, %s, %s)

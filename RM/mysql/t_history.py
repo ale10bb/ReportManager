@@ -1,5 +1,6 @@
 # -*- coding: UTF-8 -*-
 import logging
+from .client import Transaction
 from . import var
 
 # -------------------------------------
@@ -37,7 +38,7 @@ def search(code:str='', name:str='', company:str='', author_id:str='', page_inde
     assert type(page_size) == int, 'invalid arg: page_size'
 
     ret = {'all': [], 'total': 0}
-    with var.transaction as cursor:
+    with Transaction(var.pool) as cursor:
         inputCodes = set(['%{}%'.format(item) for item in code.split('+')])
         codes_condition = ' AND '.join(['JSON_SEARCH(JSON_KEYS(names), \'one\', %s) IS NOT NULL'] * len(inputCodes)) + ' AND '
         cursor.execute('''
@@ -87,7 +88,7 @@ def fetch(history_id:int) -> tuple:
     logger.debug('args: {}'.format({'history_id': history_id}))
     assert type(history_id) == int, 'invalid arg: history_id'
 
-    with var.transaction as cursor:
+    with Transaction(var.pool) as cursor:
         cursor.execute('''
             SELECT h.id, u_a.id, u_a.name, u_r.id, u_r.name, UNIX_TIMESTAMP(h.start), UNIX_TIMESTAMP(h.end), h.pages, h.urgent, h.company, h.names
             FROM history h
@@ -111,7 +112,7 @@ def pop() -> tuple:
     '''
     logger = logging.getLogger(__name__)
 
-    with var.transaction as cursor:
+    with Transaction(var.pool) as cursor:
         cursor.execute('''
             SELECT h.id, u_a.id, u_a.name, u_r.id, u_r.name, UNIX_TIMESTAMP(h.start), UNIX_TIMESTAMP(h.end), h.pages, h.urgent, h.company, h.names
             FROM history h
@@ -139,7 +140,7 @@ def pop() -> tuple:
 #     # 初始化ret结构
 #     ret = []
 
-#     with var.transaction as cursor:
+#     with Transaction(var.pool) as cursor:
 #         cursor.execute('''
 #             SELECT authorid, CAST(
 #                 concat('{', GROUP_CONCAT(SUBSTRING_INDEX(SUBSTR(names,2), '}', 1)), '}')

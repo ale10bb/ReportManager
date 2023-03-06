@@ -1,5 +1,6 @@
 # -*- coding: UTF-8 -*-
 import logging
+from .client import Transaction
 from . import var
 
 # ------------------------------------
@@ -32,7 +33,7 @@ def search(user_id:str='', name:str='', phone:str='', only_reviewer:bool=False) 
     assert type(phone) == str, 'invalid arg: phone'
 
     ret = {'user': []}
-    with var.transaction as cursor:
+    with Transaction(var.pool) as cursor:
         if only_reviewer:
             cursor.execute('''
                 SELECT id, name, phone, role, status
@@ -71,7 +72,7 @@ def fetch(user_id:str) -> tuple:
     logger.debug('args: {}'.format({'user_id': user_id}))
     assert type(user_id) == str, 'invalid arg: user_id'
 
-    with var.transaction as cursor:
+    with Transaction(var.pool) as cursor:
         cursor.execute('''
             SELECT id, name, phone, role, status
             FROM user
@@ -102,7 +103,7 @@ def __contains__(user_id:str, only_reviewer:bool=False) -> bool:
     logger.debug('args: {}'.format({'user_id': user_id, 'only_reviewer': only_reviewer}))
     assert type(user_id) == str, 'invalid arg: user_id'
     
-    with var.transaction as cursor:
+    with Transaction(var.pool) as cursor:
         if only_reviewer:
             cursor.execute(
                 "SELECT 1 FROM user WHERE available = 1 AND role = 1 AND id = %s", (user_id,)
@@ -144,7 +145,7 @@ def pop(count:int=1, excludes:list=None, urgent:bool=False, hide_busy:bool=True)
     assert type(excludes) == list, 'invalid arg: excludes'
 
     selectResults = []
-    with var.transaction as cursor:
+    with Transaction(var.pool) as cursor:
         # 选择审核人，按工作量（当前报告、当前页数）排序
         # 前一个完成审核的人赋予skipped参数，默认降权到最后一个
         cursor.execute('''
@@ -195,7 +196,7 @@ def set_status(user_id:str, status:int):
     assert __contains__(user_id), 'invalid arg: user_id'
     assert status in [0, 1, 2], 'invalid arg: status'
 
-    with var.transaction as cursor:
+    with Transaction(var.pool) as cursor:
         cursor.execute('''
             UPDATE user
             SET status = %s, status_since = NOW() 
@@ -218,7 +219,7 @@ def reset_status(days:int=7):
     logger.debug('args: {}'.format({'days': days}))
     assert type(days) == int, 'invalid arg: days'
 
-    with var.transaction as cursor:
+    with Transaction(var.pool) as cursor:
         cursor.execute('''
             UPDATE user
             SET status = 0, status_since = NOW() 

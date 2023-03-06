@@ -2,6 +2,7 @@
 import logging
 import json
 import hashlib
+from .client import Transaction
 from . import var
 from . import t_user
 
@@ -38,7 +39,7 @@ def search(code:str='', user_id:str='', page_index:int=1, page_size:int=10) -> d
     assert type(page_size) == int, 'invalid arg: page_size'
 
     ret = {'all': [], 'submit': [], 'review': [], 'total': 0}
-    with var.transaction as cursor:
+    with Transaction(var.pool) as cursor:
         inputCodes = set(['%{}%'.format(item) for item in code.split('+')])
         codes_condition = ' AND '.join(['JSON_SEARCH(JSON_KEYS(names), \'one\', %s) IS NOT NULL'] * len(inputCodes))
         cursor.execute('''
@@ -86,7 +87,7 @@ def fetch(current_id:str) -> tuple:
     logger.debug('args: {}'.format({'current_id': current_id}))
     assert type(current_id) == str, 'invalid arg: current_id'
 
-    with var.transaction as cursor:
+    with Transaction(var.pool) as cursor:
         cursor.execute('''
             SELECT c.id, u_a.id, u_a.name, u_r.id, u_r.name, UNIX_TIMESTAMP(c.start), null, c.pages, c.urgent, c.company, c.names
             FROM current c
@@ -145,7 +146,7 @@ def add(names:dict, company:str, pages:int, urgent:bool, author_id:str, submit_t
     current_id = hashlib.sha256(code.encode('utf-8')).hexdigest()
     logger.debug('current_id: {}'.format(current_id))
 
-    with var.transaction as cursor:
+    with Transaction(var.pool) as cursor:
         cursor.execute('''
             INSERT INTO current (id, names, company, pages, urgent, authorid, start)
             VALUES (%s, %s, %s, %s, %s, %s, FROM_UNIXTIME(%s))
@@ -181,7 +182,7 @@ def edit(current_id:str, **kwargs):
 
     # 加急报告设置页数的系数
     modified_pages_search = int(ret[7] * 1.5) if ret[8] else ret[7]
-    with var.transaction as cursor:
+    with Transaction(var.pool) as cursor:
         if 'reviewerid' in kwargs.keys():
             # 修改审核人
             logger.debug('reviewerid: {} -> {}'.format(ret[3], kwargs['reviewerid']))
@@ -286,7 +287,7 @@ def delete(current_id:str, finish_timestamp:int, force:bool=False):
     assert ret, 'invalid arg: current_id'
     assert type(finish_timestamp) == int, 'invalid arg: finish_timestamp'
 
-    with var.transaction as cursor:
+    with Transaction(var.pool) as cursor:
         # 删除current记录
         cursor.execute(
             "DELETE FROM current WHERE id = %s", (ret[0],)
