@@ -36,7 +36,7 @@ class RedisStream:
         logger = logging.getLogger(__name__)
         logger.debug('args: {}'.format({'command': command, 'kwargs': kwargs}))
         self._r.xadd('RM', {'command': command, 'kwargs': json.dumps(kwargs)})
-        logger.debug(self._r.xlen('RM'))
+        logger.debug('len: {}'.format(self._r.xlen('RM')))
 
     def read(self) -> dict:
         ''' 在Stream以阻塞方式读取一条指令
@@ -60,4 +60,5 @@ class RedisStream:
         ''' 修剪Stream长度至10
 
         '''
-        self._r.xtrim(name='RM', maxlen=10)
+        logger = logging.getLogger(__name__)
+        logger.debug('original len: {}'.format(self._r.xtrim(name='RM', maxlen=10)))
