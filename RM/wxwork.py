@@ -55,16 +55,16 @@ class WXWork:
         '''
         logger = logging.getLogger(__name__)
         session = requests.session()
-        r = session.get('https://qyapi.weixin.qq.com/cgi-bin/agent/get?access_token={}&agentid={}'.format(self._access_token, self._agentid)).json()
-        if r['errcode']:
+
+        for _ in range(3):
+            r = session.get('https://qyapi.weixin.qq.com/cgi-bin/gettoken?corpid={}&corpsecret={}'.format(self._corpid, self._secret)).json()
             logger.debug(r)
-            for _ in range(3):
-                r = session.get('https://qyapi.weixin.qq.com/cgi-bin/gettoken?corpid={}&corpsecret={}'.format(self._corpid, self._secret)).json()
-                if not r['errcode']:
-                    self._access_token = r['access_token']
-                    logger.debug(r)
-                    return
-            logger.error('Cannot refresh token')
+            if r['errcode']:
+                continue
+            self._access_token = r['access_token']
+            return
+        else:
+            logger.error('gettoken failed: {}'.format(r['errmsg']))
             raise TimeoutError
 
     def send_text(self, content:str, to:list=[], to_debug:bool=False, to_stdout:bool=False):
