@@ -290,18 +290,18 @@ def do_mail(check_results:dict=None):
         for dir_path in dir_paths(filtered_walk(attachments_path, min_depth=1, depth=1)):
             shutil.rmtree(dir_path)
 
-        ## 对于提交审核，仅将temp中的文件夹重命名
+        ## 对于提交审核，将attachments_path重命名并移动至temp中
         if check_results['operator'] == 'submit':
             new_work_path = os.path.join(
                 storage, 
                 'temp', 
                 '{}_{}_{}'.format(
-                    int(datetime.datetime.now().timestamp()), 
+                    datetime.datetime.now().timestamp(), 
                     check_results['target'][1], 
                     '+'.join(json.loads(check_results['target'][10]).keys())
                 )
             )
-        ## 对于完成审核，将文件夹移动至archive并重命名，重名时清除上一条记录
+        ## 对于完成审核，将attachments_path重命名并移动至archive中，重名时清除上一条记录
         if check_results['operator'] == 'finish':
             new_work_path = os.path.join(
                 storage, 
@@ -311,7 +311,8 @@ def do_mail(check_results:dict=None):
             if os.path.isdir(new_work_path):
                 shutil.rmtree(new_work_path)
         ## 存档操作结束后更新check_results中的work_path
-        shutil.move(check_results['work_path'], new_work_path)
+        shutil.move(attachments_path, new_work_path)
+        shutil.rmtree(check_results['work_path'])
         check_results['work_path'] = new_work_path
         logger.info('new work_path: {}'.format(new_work_path))
 
@@ -514,12 +515,12 @@ if __name__ == "__main__":
                 for received_mail in received_mails:
                     do_mail(received_mail)
             elif item['command'] == 'read':
-                check_results = mail.read(
+                local_mail = mail.read(
                     os.path.join(storage, 'temp'),
                     item['kwargs']['key'],
                     item['kwargs']['file'],
                 )
-                do_mail(check_results)
+                do_mail(local_mail)
             elif item['command'] == 'resend':
                 do_resend(**item['kwargs'])
         except Exception as err:
