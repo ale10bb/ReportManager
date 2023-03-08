@@ -4,7 +4,7 @@ import logging
 import datetime
 import zmail
 from email.header import Header
-from email.utils import formataddr
+from email.utils import formataddr, parseaddr
 import requests
 
 class Mail:
@@ -109,10 +109,16 @@ class Mail:
                     'warnings': []
                 }
                 logger.debug('mail: {}'.format(check_results['mail']))
-                check_results['work_path'] = os.path.join(temp_path, '{}_{}'.format(int(datetime.datetime.now().timestamp() * 1000), operator))
+                check_results['work_path'] = os.path.join(
+                    temp_path, 
+                    '{}_{}_'.format(
+                        datetime.datetime.now().timestamp(), 
+                        parseaddr(check_results['mail']['from'])[1].split('@')[0]
+                    )
+                )
                 os.mkdir(check_results['work_path'])
                 logger.info('saving eml to "{}"'.format(check_results['work_path']))
-                zmail.save(mail, 'raw.eml', target_path=check_results['work_path'], overwrite=True)
+                zmail.save(mail, '{}.eml'.format(operator), target_path=check_results['work_path'], overwrite=True)
                 os.mkdir(os.path.join(check_results['work_path'], 'attachments'))
                 zmail.save_attachment(mail, target_path=os.path.join(check_results['work_path'], 'attachments'), overwrite=True)
                 ret.append(check_results)
@@ -155,10 +161,13 @@ class Mail:
             'warnings': []
         }
         logger.debug('mail: {}'.format(check_results['mail']))
-        check_results['work_path'] = os.path.join(temp_path, '{}_{}'.format(int(datetime.datetime.now().timestamp() * 1000), key))
+        check_results['work_path'] = os.path.join(
+            temp_path, 
+            '{}_{}_'.format(datetime.datetime.now().timestamp(), key)
+        )
         os.mkdir(check_results['work_path'])
         logger.info('saving eml to "{}"'.format(check_results['work_path']))
-        zmail.save(mail, 'raw.eml', target_path=check_results['work_path'], overwrite=True)
+        zmail.save(mail, '{}.eml'.format(key), target_path=check_results['work_path'], overwrite=True)
         os.mkdir(os.path.join(check_results['work_path'], 'attachments'))
         zmail.save_attachment(mail, target_path=os.path.join(check_results['work_path'], 'attachments'), overwrite=True)
 
