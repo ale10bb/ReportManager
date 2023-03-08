@@ -298,18 +298,25 @@ def do_mail(check_results:dict=None):
                 '{}_{}_{}'.format(
                     datetime.datetime.now().timestamp(), 
                     check_results['target'][1], 
-                    '+'.join(json.loads(check_results['target'][10]).keys())
+                    '+'.join(json.loads(check_results['target'][10]))
                 )
             )
-        ## 对于完成审核，将attachments_path重命名并移动至archive中，重名时清除上一条记录
+        ## 对于完成审核，将attachments_path重命名并移动至archive中，重名时清除上一条记录，同时删除temp中的提交审核记录
         if check_results['operator'] == 'finish':
             new_work_path = os.path.join(
                 storage, 
                 'archive', 
-                '{}'.format('+'.join(json.loads(check_results['target'][10]).keys()))
+                '+'.join(json.loads(check_results['target'][10])),
             )
             if os.path.isdir(new_work_path):
                 shutil.rmtree(new_work_path)
+            for dir_path in dir_paths(filtered_walk(
+                os.path.join(storage, 'temp'), 
+                included_dirs=['+'.join(json.loads(check_results['target'][10]))], 
+                depth=1, 
+                min_depth=1,
+            )):
+                shutil.rmtree(dir_path)
         ## 存档操作结束后更新check_results中的work_path
         shutil.move(attachments_path, new_work_path)
         shutil.rmtree(check_results['work_path'])
@@ -320,8 +327,8 @@ def do_mail(check_results:dict=None):
         check_results['notification'] = {}
         ## 压缩附件目录
         archive_path = archive.archive(
-            os.path.join(check_results['work_path'], 'attachments'), 
-            '+'.join(json.loads(check_results['target'][10]).keys())
+            check_results['work_path'], 
+            '+'.join(json.loads(check_results['target'][10]))
         )
 
         if check_results['operator'] == 'submit':
@@ -450,7 +457,7 @@ def do_resend(id:str|int, redirect:str=''):
         redirect = ''
 
     # 搜索最新的文件记录
-    codes = list(json.loads(target[10]).keys())
+    codes = list(json.loads(target[10]))
     codes.sort()
     work_path = list(dir_paths(filtered_walk(
         os.path.join(storage, 'temp' if type(target[0]) == str else 'archive'), 
@@ -474,7 +481,7 @@ def do_resend(id:str|int, redirect:str=''):
         logger.info('resending "{}" (完成审核) to "{}"'.format('+'.join(codes), to))
 
     # 压缩附件
-    archive_path = archive.archive(work_path, '+'.join(json.loads(target[10]).keys()))
+    archive_path = archive.archive(work_path, '+'.join(json.loads(target[10])))
     # 发送并清理临时文件
     mail.send(
         to,
@@ -484,18 +491,6 @@ def do_resend(id:str|int, redirect:str=''):
         to_stdout=debug
     )
     os.remove(archive_path)
-
-
-def do_clean():
-    ''' 清理temp中的超时缓存。
-    '''
-    logger = logging.getLogger(__name__)
-
-    # 删除temp中超过7天的文件夹
-    for path in dir_paths(filtered_walk(os.path.join(storage, 'temp'), depth=1, min_depth=1)):
-        if int(os.path.basename(path).split('_', 1)[0]) < datetime.datetime.now().timestamp() - 604800:
-            logger.info('removed "{}" due to "expiration"'.format(path))
-            shutil.rmtree(path)
 
 
 if __name__ == "__main__":
