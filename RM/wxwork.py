@@ -105,3 +105,33 @@ class WXWork:
             }
         ).json()
         logger.debug(r)
+
+    def get_redirect(self):
+        ''' 获取OAuth跳转链接。参见https://developer.work.weixin.qq.com/document/path/91022
+
+        '''
+        return 'https://open.weixin.qq.com/connect/oauth2/authorize?appid={}&redirect_uri={}&response_type=code&scope=snsapi_base&agentid={}#wechat_redirect'.format(
+            self._corpid,
+            'https%3A%2F%2Frm.chenql.cn%2Fapi%2Fauth',
+            self._agentid,
+        )
+
+    def get_userid(self, code:str) -> str:
+        ''' 根据code获取成员信息。参见https://developer.work.weixin.qq.com/document/path/91023
+
+        Args:
+            code(str): 跳转携带的code
+
+        Raises:
+            AssertionError: 如果参数类型非法
+        '''
+        logger = logging.getLogger(__name__)
+        self.refresh_access_token()
+        r = requests.get('https://qyapi.weixin.qq.com/cgi-bin/auth/getuserinfo?access_token{}=&code={}'.format(
+            self._access_token,
+            code,
+        )).json()
+        logger.debug(r)
+        if r['errcode']:
+            logger.warning('getuserinfo error: {}'.format(r['errmsg']))
+        return r.setdefault('userid', '')
