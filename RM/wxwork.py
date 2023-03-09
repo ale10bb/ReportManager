@@ -106,13 +106,16 @@ class WXWork:
         ).json()
         logger.debug(r)
 
-    def get_redirect(self):
+    def get_redirect(self, host:str):
         ''' 获取OAuth跳转链接。参见https://developer.work.weixin.qq.com/document/path/91022
+
+        Args:
+            host(str): 跳转的host（默认HTTPS）
 
         '''
         return 'https://open.weixin.qq.com/connect/oauth2/authorize?appid={}&redirect_uri={}&response_type=code&scope=snsapi_base&agentid={}#wechat_redirect'.format(
             self._corpid,
-            'https%3A%2F%2Frm.chenql.cn%2Fapi%2Fauth',
+            'https%3A%2F%2F{}%2Fapi%2Fauth'.format(host),
             self._agentid,
         )
 
