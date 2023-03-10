@@ -1,13 +1,14 @@
 # -*- coding: UTF-8 -*-
-from flask import Flask, redirect, request, g
+from functools import wraps
+
+from flask import Flask, request, g, abort
 from flask_jwt_extended import create_access_token
 from flask_jwt_extended import get_jwt_identity
-from flask_jwt_extended import jwt_required
+from flask_jwt_extended import verify_jwt_in_request
 from flask_jwt_extended import JWTManager
 
 import os
 import ipaddress
-import traceback
 import json
 import datetime
 import chinese_calendar
@@ -16,7 +17,8 @@ import RM
 
 app = Flask(__name__)
 app.config['JSON_AS_ASCII'] = False
-app.config["JWT_SECRET_KEY"] = os.urandom(12)
+app.config['JWT_SECRET_KEY'] = os.urandom(12)
+app.config['JWT_ERROR_MESSAGE_KEY'] = 'err'
 jwt = JWTManager(app)
 
 @app.before_first_request
@@ -170,47 +172,55 @@ def do_attend():
 def before_request():
     app.logger.debug('path: {}'.format(request.path))
     g.client_ip = request.headers['X-Forwarded-For'].split(',')[0] if 'X-Forwarded-For' in request.headers else request.remote_addr
-    ipaddress.ip_address(g.client_ip)
+    try:
+        ipaddress.ip_address(g.client_ip)
+    except ValueError as err:
+        abort(400, err)
     g.ret = {'result': 0, 'err': '', 'data': {}}
 
 
 @app.errorhandler(400)
 def handle_BadRequest(err):
-    g.ret['result'] = 1
-    g.ret['err'] = traceback.format_exc(limit=1)
+    g.ret['result'] = 400
+    g.ret['err'] = err.description
     return g.ret, 400
 
 
-@app.errorhandler(AssertionError)
-def handle_AssertionError(err):
-    g.ret['result'] = 2
-    g.ret['err'] = traceback.format_exc(limit=1)
+@app.errorhandler(KeyError)
+def handle_BadRequest(err):
+    g.ret['result'] = 400
+    g.ret['err'] = 'Inappropriate key: {}'.format(err)
     return g.ret, 400
 
 
 @app.errorhandler(Exception)
 def handle_Exception(err):
     g.ret['result'] = 3
-    g.ret['err'] = traceback.format_exc(limit=1)
+    g.ret['err'] = str(err)
     return g.ret, 500
 
 
-@app.after_request
-def after_request(response):
-    RM.mysql.t_audit.add(
-        g.client_ip,
-        request.headers.get('User-Agent'),
-        request.path,
-        request.json if request.data else {},
-        g.ret
-    )
-    return response
+def jwt_required():
+    def wrapper(fn):
+        @wraps(fn)
+        def decorator(*args, **kwargs):
+            verify_jwt_in_request(optional=app.config['DEBUG'])
+            user = get_jwt_identity()
+            param = {}
+            try:
+                param.update(request.args)
+                param.update(request.json)
+            except:
+                pass
+            RM.mysql.t_audit.add(g.client_ip, user, request.headers.get('User-Agent', ''), request.path, param)
+            return fn(*args, **kwargs)
+        return decorator
+    return wrapper
 
 
 @app.route('/api/auth', methods=['POST'])
 def auth():
     code = request.json.get('code', '')
-    app.logger.debug(code)
     user_id = wxwork.get_userid(code)
     if RM.mysql.t_user.__contains__(user_id):
         app.logger.info('grant access to {}'.format(user_id))
@@ -230,17 +240,18 @@ def get_redirect_url():
 
 @app.route('/api/cron', methods=['GET', 'POST'])
 def cron():
-    cron_type = request.args['type']
-    assert cron_type in ['mail', 'attend'], 'no cron route'
     current = datetime.datetime.now()
-    if cron_type == 'mail':
-        if chinese_calendar.is_workday(current) and current.hour >= 9 and current.hour < 17:
-            stream.add(command='receive', kwargs={})
-    if cron_type == 'attend':
-        if chinese_calendar.is_workday(current):
-            do_attend()
-            RM.mysql.t_user.reset_status()
-            stream.trim()
+    match request.args['type']:
+        case 'mail':
+            if chinese_calendar.is_workday(current) and current.hour >= 9 and current.hour < 17:
+                stream.add(command='receive', kwargs={})
+        case 'attend':
+            if chinese_calendar.is_workday(current):
+                do_attend()
+                RM.mysql.t_user.reset_status()
+                stream.trim()
+        case _:
+            abort(400, 'Inappropriate argument: type')
     return g.ret
 
 
@@ -248,7 +259,11 @@ def cron():
 @jwt_required()
 def mail():
     submit_text = request.json.get('submit', '[提交审核]')
+    if type(submit_text) != str:
+        abort(400, 'Inappropriate argument: submit')
     finish_text = request.json.get('finish', '[完成审核]')
+    if type(submit_text) != str:
+        abort(400, 'Inappropriate argument: finish')
     stream.add(
         command='receive', 
         kwargs={
@@ -262,12 +277,15 @@ def mail():
 @app.route('/api/history/resend', methods=['POST'])
 @jwt_required()
 def resend_history():
-    assert RM.mysql.t_history.fetch(request.json['id']), '缺少必要参数<id>'
+    if type(request.json['id']) != int:
+        abort(400, 'Inappropriate argument: id')
+    if type(request.json.setdefault('to', '')) != str:
+        abort(400, 'Inappropriate argument: to')
     stream.add(
         command='resend', 
         kwargs={
             'id': request.json['id'], 
-            'redirect': request.json.get('to', ''),
+            'redirect': request.json['to'],
         },
     )
     return g.ret
@@ -276,12 +294,15 @@ def resend_history():
 @app.route('/api/current/resend', methods=['POST'])
 @jwt_required()
 def resend_current():
-    assert RM.mysql.t_current.fetch(request.json['id']), '缺少必要参数<id>'
+    if type(request.json['id']) != str:
+        abort(400, 'Inappropriate argument: id')
+    if type(request.json.setdefault('to', '')) != str:
+        abort(400, 'Inappropriate argument: to')
     stream.add(
         command='resend', 
         kwargs={
             'id': request.json['id'], 
-            'redirect': request.json.get('to', ''),
+            'redirect': request.json['to'],
         },
     )
     return g.ret
@@ -294,14 +315,22 @@ def search_history():
     kwargs = {}
     for key, value in request.json.items():
         if key in ['code', 'name', 'company']:
+            if type(value) != str:
+                abort(400, 'Inappropriate argument: {}'.format(key))
             kwargs[key] = value
         elif key == 'author':
-            user_ids = RM.mysql.t_user.search(name=request.json['author'])['user'] + RM.mysql.t_user.search(user_id=request.json['author'])['user']
+            if type(value) != str:
+                abort(400, 'Inappropriate argument: author')
+            user_ids = RM.mysql.t_user.search(name=value)['user'] + RM.mysql.t_user.search(user_id=value)['user']
             if len(user_ids) == 1:
                 kwargs['author_id'] = user_ids[0][0]
         elif key == 'current':
+            if type(value) != int:
+                abort(400, 'Inappropriate argument: current')
             kwargs['page_index'] = value
         elif key == 'pageSize':
+            if type(value) != int:
+                abort(400, 'Inappropriate argument: pageSize')
             kwargs['page_size'] = value
     keys = ['id', 'author_id', 'author_name', 'reviewer_id', 'reviewer_name', 'start', 'end', 'page', 'urgent', 'company', 'names']
     ret = RM.mysql.t_history.search(**kwargs)
@@ -329,15 +358,21 @@ def list_current():
 @jwt_required()
 def edit_current():
     kwargs = {}
-    assert 'id' in request.json, '缺少必要参数<id>'
-    if 'reviewerID' in request.json:
-        kwargs['reviewerid'] = request.json['reviewerID']
-    if 'page' in request.json:
-        assert int(request.json['page']) > 0, '无效参数<page>'
-        kwargs['pages'] = request.json['page']
-    if 'urgent' in request.json:
-        assert type(request.json['urgent']) == bool, '无效参数<urgent>'
-        kwargs['urgent'] = request.json['urgent']
+    if type(request.json['id']) != str:
+        abort(400, 'Inappropriate argument: id')
+    for key, value in request.json.items():
+        if key == 'reviewerID':
+            if type(value) != str:
+                abort(400, 'Inappropriate argument: reviewerID')
+            kwargs['reviewerid'] = value
+        elif key == 'page':
+            if type(value) != int or value <= 0:
+                abort(400, 'Inappropriate argument: page')
+            kwargs['pages'] = value
+        elif key == 'urgent':
+            if type(value) != bool:
+                abort(400, 'Inappropriate argument: urgent')
+            kwargs['urgent'] = value
     RM.mysql.t_current.edit(request.json['id'], **kwargs)
     return g.ret
 
@@ -345,7 +380,8 @@ def edit_current():
 @app.route('/api/current/delete', methods=['POST'])
 @jwt_required()
 def delete_current():
-    assert 'id' in request.json, '缺少必要参数<id>'
+    if type(request.json['id']) != str:
+        abort(400, 'Inappropriate argument: id')
     RM.mysql.t_current.delete(request.json['id'], 0, force=True)
     return g.ret
 
@@ -354,9 +390,10 @@ def delete_current():
 @jwt_required()
 def list_user():
     g.ret['data']['user'] = []
-    assert type(request.json.get('isReviewer', False)) == bool, '无效参数<isReviewer>'
+    if type(request.json.setdefault('isReviewer', False)) != bool:
+        abort(400, 'Inappropriate argument: isReviewer')
     keys = ['id', 'name', 'role', 'status']
-    for row in RM.mysql.t_user.search(only_reviewer=request.json.get('isReviewer', False))['user']:
+    for row in RM.mysql.t_user.search(only_reviewer=request.json['isReviewer'])['user']:
         g.ret['data']['user'].append(dict(zip(keys, [row[0], row[1], row[3], row[4]])))
     return g.ret
 
@@ -364,11 +401,15 @@ def list_user():
 @app.route('/api/user/search', methods=['POST'])
 @jwt_required()
 def search_user():
+    if type(request.json.setdefault('id', '')) != str:
+        abort(400, 'Inappropriate argument: id')
+    if type(request.json.setdefault('name', '')) != str:
+        abort(400, 'Inappropriate argument: name')
     g.ret['data']['user'] = []
     keys = ['id', 'name', 'role', 'status']
     for row in RM.mysql.t_user.search(
-        user_id=request.json.get('id', ''),
-        name=request.json.get('name', ''),
+        user_id=request.json['id'],
+        name=request.json['name'],
     )['user']:
         g.ret['data']['user'].append(dict(zip(keys, [row[0], row[1], row[3], row[4]])))
     return g.ret
@@ -387,8 +428,10 @@ def list_queue():
 @app.route('/api/user/status', methods=['POST'])
 @jwt_required()
 def user_status():
-    assert 'id' in request.json, '缺少必要参数<id>'
-    assert 'status' in request.json, '缺少必要参数<status>'
+    if type(request.json['id']) != str:
+        abort(400, 'Inappropriate argument: id')
+    if type(request.json['status']) != int:
+        abort(400, 'Inappropriate argument: status')
     RM.mysql.t_user.set_status(request.json['id'], request.json['status'])
     return g.ret
 
