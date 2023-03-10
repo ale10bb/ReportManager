@@ -321,7 +321,7 @@ def search_history():
         elif key == 'author':
             if type(value) != str:
                 abort(400, 'Inappropriate argument: author')
-            user_ids = RM.mysql.t_user.search(name=value)['user'] + RM.mysql.t_user.search(user_id=value)['user']
+            user_ids = RM.mysql.t_user.search(name=value) + RM.mysql.t_user.search(user_id=value)
             if len(user_ids) == 1:
                 kwargs['author_id'] = user_ids[0][0]
         elif key == 'current':
@@ -393,8 +393,8 @@ def list_user():
     if type(request.json.setdefault('isReviewer', False)) != bool:
         abort(400, 'Inappropriate argument: isReviewer')
     keys = ['id', 'name', 'role', 'status']
-    for row in RM.mysql.t_user.search(only_reviewer=request.json['isReviewer'])['user']:
-        g.ret['data']['user'].append(dict(zip(keys, [row[0], row[1], row[3], row[4]])))
+    for row in RM.mysql.t_user.search(only_reviewer=request.json['isReviewer']):
+        g.ret['data']['user'].append(dict(zip(keys, [row[0], row[1], row[4], row[5]])))
     return g.ret
 
 
@@ -407,11 +407,8 @@ def search_user():
         abort(400, 'Inappropriate argument: name')
     g.ret['data']['user'] = []
     keys = ['id', 'name', 'role', 'status']
-    for row in RM.mysql.t_user.search(
-        user_id=request.json['id'],
-        name=request.json['name'],
-    )['user']:
-        g.ret['data']['user'].append(dict(zip(keys, [row[0], row[1], row[3], row[4]])))
+    for row in RM.mysql.t_user.search(user_id=request.json['id'], name=request.json['name']):
+        g.ret['data']['user'].append(dict(zip(keys, [row[0], row[1], row[4], row[5]])))
     return g.ret
 
 

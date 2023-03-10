@@ -5,7 +5,7 @@ import datetime
 import zmail
 from email.header import Header
 from email.utils import formataddr, parseaddr
-import requests
+from . import mysql
 
 class Mail:
     ''' zmail的封装客户端，实现邮件收发
@@ -198,6 +198,7 @@ class Mail:
             'to_stdout': to_stdout,
         }))
         assert type(user_id) == str, 'invalid arg: user_id'
+        recipient = mysql.t_user.fetch(user_id)[3]
         assert type(subject) == str, 'invalid arg: subject'
         assert type(content) == str, 'invalid arg: content'
         if attachment:
@@ -229,6 +230,6 @@ class Mail:
         logger.debug('size of "{}": {:.2}MB'.format(os.path.basename(attachment), size / 1048576))
 
         if self._mail_config['default_cc'] and needs_cc:
-            smtp_server.send_mail('{}@{}'.format(user_id, self._mail_config['default_domain']), mail, cc='{}@{}'.format(self._mail_config['default_cc'], self._mail_config['default_domain']))
+            smtp_server.send_mail(recipient, mail, cc='{}@{}'.format(self._mail_config['default_cc'], self._mail_config['default_domain']))
         else:
-            smtp_server.send_mail('{}@{}'.format(user_id, self._mail_config['default_domain']), mail)
+            smtp_server.send_mail(recipient, mail)

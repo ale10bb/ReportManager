@@ -11,7 +11,7 @@ def init(**kwargs):
     test_cnx = var.pool.get_connection()
     test_cursor = test_cnx.cursor(buffered=True)
     test_cursor.execute('''
-        SELECT id, name, phone, role, pages, available, status, status_since
+        SELECT id, name, phone, email, role, pages, available, status, status_since
         FROM user 
         LIMIT 1
     ''')

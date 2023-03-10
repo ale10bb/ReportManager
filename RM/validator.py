@@ -33,7 +33,7 @@ def check_mail_content(mail_content:dict) -> dict:
 
     ret = {'warnings': [], 'content': {'user_id': '', 'name': '', 'urgent': False, 'excludes': [], 'force': ''}}
     # 从from中读取发信人并校验，校验内容为：
-    #   域名必须为配置文件中的_MAIL_DOMAIN & 用户名必须位于user表中
+    #   发件人邮箱必须位于user表中
     #   如果subject中包含"--sender userid"参数，则在检验userid有效后，将其作为发信人
     # 预期结果：
     #   流程正常完成时，在ret中填入user_id、name
@@ -52,14 +52,17 @@ def check_mail_content(mail_content:dict) -> dict:
     if args.sender:
         user_id = args.sender
         logger.info('manual sender: {}'.format(args.sender))
+        user_record = mysql.t_user.fetch(user_id)
     else:
-        user_id = parseaddr(mail_content['from'])[1].split('@')[0]
-
-    if mysql.t_user.__contains__(user_id):
-        name = mysql.t_user.fetch(user_id)[1]
+        result = mysql.t_user.search(email=parseaddr(mail_content['from'])[1])
+        if len(result) == 1:
+            user_record = result[0]
+        else:
+            user_record = tuple()
+    if user_record:
         ret['content']['user_id'] = user_id
-        ret['content']['name'] = name
-        logger.info('sender: {}/{}'.format(user_id, name))
+        ret['content']['name'] = user_record[1]
+        logger.info('sender: {}/{}'.format(user_id, user_record[1]))
     else:
         raise ValueError('Invalid sender "{}"'.format(mail_content['from']))
 
@@ -102,8 +105,8 @@ def check_mail_content(mail_content:dict) -> dict:
             # 检查组员并修改为user_id
             for member in cmds[1].split('、'):
                 excludes.extend(
-                    mysql.t_user.search(user_id=member, only_reviewer=True)['user'] +
-                    mysql.t_user.search(name=member, only_reviewer=True)['user']
+                    mysql.t_user.search(user_id=member, only_reviewer=True) +
+                    mysql.t_user.search(name=member, only_reviewer=True)
                 )
             excludes = [i[0] for i in excludes]
             if len(members) != len(excludes):
@@ -111,7 +114,7 @@ def check_mail_content(mail_content:dict) -> dict:
             logger.info('excludes: {}'.format(excludes))
         if cmds[0] == '指定':
             # 检查指定并修改为主键
-            users = mysql.t_user.search(user_id=cmds[1], only_reviewer=True)['user'] + mysql.t_user.search(name=cmds[1], only_reviewer=True)['user']
+            users = mysql.t_user.search(user_id=cmds[1], only_reviewer=True) + mysql.t_user.search(name=cmds[1], only_reviewer=True)
             if len(users) == 1:
                 force = users[0][0]
             else:

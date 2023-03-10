@@ -8,49 +8,50 @@ from . import var
 # ------------------------------------
 # 注：仅可由命令逻辑调用，默认参数均为合法
 #     此处不得增删user表，要增删的话，需直接修改数据库
-#     不进行commit操作
 #     仅提供修改pages的接口
 
-def search(user_id:str='', name:str='', phone:str='', only_reviewer:bool=False) -> dict:
-    ''' 根据{user_id}、{name}、{phone}以及是否为审核人模糊搜索user表内容。
+def search(user_id:str='', name:str='', phone:str='', email:str='', only_reviewer:bool=False) -> list:
+    ''' 根据{user_id}、{name}、{phone}、{email}以及是否为审核人模糊搜索user表内容。
 
     Args:
         user_id(str): 用户ID（可选/默认值空）
         name(str): 用户姓名（可选/默认值空）
         phone(str): 用户手机（可选/默认值空）
+        email(str): 用户手机（可选/默认值空）
         only_reviewer: 只搜索审核人（可选/默认值False）
 
     Returns:
-        {"user": [(id, name, phone, role, status), ...]}
+        [(id, name, phone, email, role, status), ...]
 
     Raises:
         AssertionError: 如果参数类型非法
     '''
     logger = logging.getLogger(__name__)
-    logger.debug('args: {}'.format({'user_id': user_id, 'name': name, 'phone': phone, 'only_reviewer': only_reviewer}))
+    logger.debug('args: {}'.format({'user_id': user_id, 'name': name, 'phone': phone, 'email': email, 'only_reviewer': only_reviewer}))
     assert type(user_id) == str, 'invalid arg: user_id'
     assert type(name) == str, 'invalid arg: name'
     assert type(phone) == str, 'invalid arg: phone'
+    assert type(email) == str, 'invalid arg: email'
 
-    ret = {'user': []}
+    ret = []
     with Transaction(var.pool) as cursor:
         if only_reviewer:
             cursor.execute('''
-                SELECT id, name, phone, role, status
+                SELECT id, name, phone, email, role, status
                 FROM user
-                WHERE available = 1 AND role = 1 AND id LIKE %s AND name LIKE %s AND phone LIKE %s
-                ''', ('%{}%'.format(user_id), '%{}%'.format(name), '%{}%'.format(phone))
+                WHERE available = 1 AND role = 1 AND id LIKE %s AND name LIKE %s AND phone LIKE %s AND email LIKE %s
+                ''', ('%{}%'.format(user_id), '%{}%'.format(name), '%{}%'.format(phone), '%{}%'.format(email))
             )
             logger.debug(cursor.statement)
         else:
             cursor.execute('''
-                SELECT id, name, phone, role, status
+                SELECT id, name, phone, email, role, status
                 FROM user
-                WHERE available = 1 AND id LIKE %s AND name LIKE %s AND phone LIKE %s
-                ''', ('%{}%'.format(user_id), '%{}%'.format(name), '%{}%'.format(phone))
+                WHERE available = 1 AND id LIKE %s AND name LIKE %s AND phone LIKE %s AND email LIKE %s
+                ''', ('%{}%'.format(user_id), '%{}%'.format(name), '%{}%'.format(phone), '%{}%'.format(email))
             )
             logger.debug(cursor.statement)
-        ret['user'] = cursor.fetchall()
+        ret = cursor.fetchall()
 
     logger.debug('return: {}'.format(ret))
     return ret
@@ -63,7 +64,7 @@ def fetch(user_id:str) -> tuple:
         user_id(str): 用户ID
 
     Returns:
-        (id, name, phone, role, status)
+        (id, name, phone, email, role, status)
 
     Raises:
         AssertionError: 如果参数类型非法
@@ -74,7 +75,7 @@ def fetch(user_id:str) -> tuple:
 
     with Transaction(var.pool) as cursor:
         cursor.execute('''
-            SELECT id, name, phone, role, status
+            SELECT id, name, phone, email, role, status
             FROM user
             WHERE id = %s
             ''', (user_id,)
