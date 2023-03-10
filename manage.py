@@ -205,14 +205,14 @@ def jwt_required():
         @wraps(fn)
         def decorator(*args, **kwargs):
             verify_jwt_in_request(optional=app.config['DEBUG'])
-            user = get_jwt_identity()
+            g.user_id = get_jwt_identity()
             param = {}
             try:
                 param.update(request.args)
                 param.update(request.json)
             except:
                 pass
-            RM.mysql.t_audit.add(g.client_ip, user, request.headers.get('User-Agent', ''), request.path, param)
+            RM.mysql.t_audit.add(g.client_ip, g.user_id, request.headers.get('User-Agent', ''), request.path, param)
             return fn(*args, **kwargs)
         return decorator
     return wrapper
@@ -230,6 +230,15 @@ def auth():
         g.ret['result'] = 401
         g.ret['err'] = 'invalid user'
         return g.ret
+    
+
+@app.route('/utils/genToken')
+def genToken():
+    user_info = RM.mysql.t_user.fetch(request.args['user_id'])
+    if user_info:
+        return create_access_token(identity=user_info[0], expires_delta=datetime.timedelta(days=1))
+    else:
+        return ''
 
 
 @app.route('/api/redirect', methods=['POST'])
@@ -422,14 +431,21 @@ def list_queue():
     return g.ret
 
 
+@app.route('/api/user/info', methods=['POST'])
+@jwt_required()
+def user_info():
+    keys = ['id', 'name', 'role', 'status']
+    row = RM.mysql.t_user.fetch(user_id=g.user_id)
+    g.ret['data']['user'] = (dict(zip(keys, [row[0], row[1], row[4], row[5]])))
+    return g.ret
+
+
 @app.route('/api/user/status', methods=['POST'])
 @jwt_required()
 def user_status():
-    if type(request.json['id']) != str:
-        abort(400, 'Inappropriate argument: id')
     if type(request.json['status']) != int:
         abort(400, 'Inappropriate argument: status')
-    RM.mysql.t_user.set_status(request.json['id'], request.json['status'])
+    RM.mysql.t_user.set_status(g.user_id, request.json['status'])
     return g.ret
 
 
