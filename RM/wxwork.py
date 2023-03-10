@@ -115,7 +115,7 @@ class WXWork:
         '''
         return 'https://open.weixin.qq.com/connect/oauth2/authorize?appid={}&redirect_uri={}&response_type=code&scope=snsapi_base&agentid={}#wechat_redirect'.format(
             self._corpid,
-            'https%3A%2F%2F{}%2Fapi%2Fauth'.format(host),
+            'https%3A%2F%2F{}%2Fauth'.format(host),
             self._agentid,
         )
 
@@ -130,7 +130,7 @@ class WXWork:
         '''
         logger = logging.getLogger(__name__)
         self.refresh_access_token()
-        r = requests.get('https://qyapi.weixin.qq.com/cgi-bin/auth/getuserinfo?access_token{}=&code={}'.format(
+        r = requests.get('https://qyapi.weixin.qq.com/cgi-bin/auth/getuserinfo?access_token={}&code={}'.format(
             self._access_token,
             code,
         )).json()
