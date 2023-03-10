@@ -312,7 +312,7 @@ def do_mail(check_results:dict=None):
                 shutil.rmtree(new_work_path)
             for dir_path in dir_paths(filtered_walk(
                 os.path.join(storage, 'temp'), 
-                included_dirs=['+'.join(json.loads(check_results['target'][10]))], 
+                included_dirs=['*'+'+'.join(json.loads(check_results['target'][10]))], 
                 depth=1, 
                 min_depth=1,
             )):
