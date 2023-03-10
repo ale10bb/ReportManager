@@ -1,5 +1,11 @@
 # -*- coding: UTF-8 -*-
-from flask import Flask, request, g
+from flask import Flask, redirect, request, g
+from flask_jwt_extended import create_access_token
+from flask_jwt_extended import get_jwt_identity
+from flask_jwt_extended import jwt_required
+from flask_jwt_extended import JWTManager
+
+import os
 import ipaddress
 import traceback
 import json
@@ -10,6 +16,8 @@ import RM
 
 app = Flask(__name__)
 app.config['JSON_AS_ASCII'] = False
+app.config["JWT_SECRET_KEY"] = os.urandom(12)
+jwt = JWTManager(app)
 
 @app.before_first_request
 def before_first_request():
@@ -19,10 +27,8 @@ def before_first_request():
     config.read(os.path.join('conf','RM.conf'), encoding='UTF-8')
 
     # ---运行模式（debug）---
-    app.logger.info('---- Initiating mode ----')
     global debug
     debug = config.getboolean('mode', 'debug', fallback=False)
-    app.logger.info('debug: {}'.format(debug))
 
     # ---logger---
     import logging.config
@@ -162,6 +168,7 @@ def do_attend():
 
 @app.before_request
 def before_request():
+    app.logger.debug('path: {}'.format(request.path))
     g.client_ip = request.headers['X-Forwarded-For'].split(',')[0] if 'X-Forwarded-For' in request.headers else request.remote_addr
     ipaddress.ip_address(g.client_ip)
     g.ret = {'result': 0, 'err': '', 'data': {}}
@@ -193,11 +200,32 @@ def after_request(response):
     RM.mysql.t_audit.add(
         g.client_ip,
         request.headers.get('User-Agent'),
-        request.full_path,
+        request.path,
         request.json if request.data else {},
         g.ret
     )
     return response
+
+
+@app.route('/api/auth', methods=['POST'])
+def auth():
+    code = request.json.get('code', '')
+    app.logger.debug(code)
+    user_id = wxwork.get_userid(code)
+    if RM.mysql.t_user.__contains__(user_id):
+        app.logger.info('grant access to {}'.format(user_id))
+        g.ret['data']['token'] = create_access_token(identity=user_id)
+        return g.ret
+    else:
+        g.ret['result'] = 401
+        g.ret['err'] = 'invalid user'
+        return g.ret
+
+
+@app.route('/api/redirect', methods=['POST'])
+def get_redirect_url():
+    g.ret['data']['url'] = wxwork.get_redirect(host=request.host)
+    return g.ret
 
 
 @app.route('/api/cron', methods=['GET', 'POST'])
@@ -217,6 +245,7 @@ def cron():
 
 
 @app.route('/api/mail', methods=['POST'])
+@jwt_required()
 def mail():
     submit_text = request.json.get('submit', '[提交审核]')
     finish_text = request.json.get('finish', '[完成审核]')
@@ -231,6 +260,7 @@ def mail():
 
 
 @app.route('/api/history/resend', methods=['POST'])
+@jwt_required()
 def resend_history():
     assert RM.mysql.t_history.fetch(request.json['id']), '缺少必要参数<id>'
     stream.add(
@@ -244,6 +274,7 @@ def resend_history():
 
 
 @app.route('/api/current/resend', methods=['POST'])
+@jwt_required()
 def resend_current():
     assert RM.mysql.t_current.fetch(request.json['id']), '缺少必要参数<id>'
     stream.add(
@@ -256,7 +287,8 @@ def resend_current():
     return g.ret
 
 
-@app.route('/api2/history/search', methods=['POST'])
+@app.route('/api/history/search', methods=['POST'])
+@jwt_required()
 def search_history():
     g.ret['data']['history'] = []
     kwargs = {}
@@ -280,7 +312,8 @@ def search_history():
     return g.ret
 
 
-@app.route('/api2/current/list', methods=['POST'])
+@app.route('/api/current/list', methods=['POST'])
+@jwt_required()
 def list_current():
     g.ret['data']['current'] = []
     keys = ['id', 'author_id', 'author_name', 'reviewer_id', 'reviewer_name', 'start', 'end', 'page', 'urgent', 'company', 'names']
@@ -292,7 +325,8 @@ def list_current():
     return g.ret
 
 
-@app.route('/api2/current/edit', methods=['POST'])
+@app.route('/api/current/edit', methods=['POST'])
+@jwt_required()
 def edit_current():
     kwargs = {}
     assert 'id' in request.json, '缺少必要参数<id>'
@@ -308,14 +342,16 @@ def edit_current():
     return g.ret
 
 
-@app.route('/api2/current/delete', methods=['POST'])
+@app.route('/api/current/delete', methods=['POST'])
+@jwt_required()
 def delete_current():
     assert 'id' in request.json, '缺少必要参数<id>'
     RM.mysql.t_current.delete(request.json['id'], 0, force=True)
     return g.ret
 
 
-@app.route('/api2/user/list', methods=['POST'])
+@app.route('/api/user/list', methods=['POST'])
+@jwt_required()
 def list_user():
     g.ret['data']['user'] = []
     assert type(request.json.get('isReviewer', False)) == bool, '无效参数<isReviewer>'
@@ -325,7 +361,8 @@ def list_user():
     return g.ret
 
 
-@app.route('/api2/user/search', methods=['POST'])
+@app.route('/api/user/search', methods=['POST'])
+@jwt_required()
 def search_user():
     g.ret['data']['user'] = []
     keys = ['id', 'name', 'role', 'status']
@@ -337,7 +374,8 @@ def search_user():
     return g.ret
 
 
-@app.route('/api2/queue/list', methods=['POST'])
+@app.route('/api/queue/list', methods=['POST'])
+@jwt_required()
 def list_queue():
     g.ret['data']['queue'] = []
     keys = ['id', 'name', 'role', 'status', 'pages_diff', 'current', 'skipped']
@@ -346,7 +384,8 @@ def list_queue():
     return g.ret
 
 
-@app.route('/api2/user/status', methods=['POST'])
+@app.route('/api/user/status', methods=['POST'])
+@jwt_required()
 def user_status():
     assert 'id' in request.json, '缺少必要参数<id>'
     assert 'status' in request.json, '缺少必要参数<status>'
