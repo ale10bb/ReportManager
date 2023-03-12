@@ -77,7 +77,7 @@ def fetch(user_id:str) -> tuple:
         cursor.execute('''
             SELECT id, name, phone, email, role, status
             FROM user
-            WHERE id = %s
+            WHERE available = 1 AND id = %s
             ''', (user_id,)
         )
         logger.debug(cursor.statement)
