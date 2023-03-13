@@ -355,11 +355,14 @@ def search_history():
 def list_current():
     g.ret['data']['current'] = []
     keys = ['id', 'author_id', 'author_name', 'reviewer_id', 'reviewer_name', 'start', 'end', 'page', 'urgent', 'company', 'names']
-    ret = RM.mysql.t_current.search(page_size=9999)
-    for row in ret['all']:
+    ret = RM.mysql.t_current.search(user_id=g.user_id, page_size=9999)
+    for row in ret['submit']:
         g.ret['data']['current'].append(dict(zip(keys, row)))
         g.ret['data']['current'][-1]['names'] = json.loads(g.ret['data']['current'][-1]['names'])
-    g.ret['data']['total'] = ret['total']
+    for row in ret['review']:
+        g.ret['data']['current'].append(dict(zip(keys, row)))
+        g.ret['data']['current'][-1]['names'] = json.loads(g.ret['data']['current'][-1]['names'])
+    g.ret['data']['total'] = len(ret['submit']) + len(ret['review'])
     return g.ret
 
 
@@ -434,9 +437,15 @@ def list_queue():
 @app.route('/api/user/info', methods=['POST'])
 @jwt_required()
 def user_info():
-    keys = ['id', 'name', 'role', 'status']
-    row = RM.mysql.t_user.fetch(user_id=g.user_id)
-    g.ret['data']['user'] = (dict(zip(keys, [row[0], row[1], row[4], row[5]])))
+    keys = ['id', 'name', 'role', 'status', 'pages_diff', 'current', 'skipped', 'priority']
+    for idx, row in enumerate(RM.mysql.t_user.pop(count=9999, hide_busy=False)):
+        if row[0] == g.user_id:
+            g.ret['data']['user'] = dict(zip(keys, list(row) + [idx + 1]))
+            break
+    else:
+        keys = ['id', 'name', 'role', 'status']
+        row = RM.mysql.t_user.fetch(user_id=g.user_id)
+        g.ret['data']['user'] = (dict(zip(keys, [row[0], row[1], row[4], row[5]])))
     return g.ret
 
 
