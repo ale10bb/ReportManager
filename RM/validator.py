@@ -60,9 +60,9 @@ def check_mail_content(mail_content:dict) -> dict:
         else:
             user_record = tuple()
     if user_record:
-        ret['content']['user_id'] = user_id
+        ret['content']['user_id'] = user_record[0]
         ret['content']['name'] = user_record[1]
-        logger.info('sender: {}/{}'.format(user_id, user_record[1]))
+        logger.info('sender: {}/{}'.format(user_record[0], user_record[1]))
     else:
         raise ValueError('Invalid sender "{}"'.format(mail_content['from']))
 
@@ -124,7 +124,7 @@ def check_mail_content(mail_content:dict) -> dict:
     # 考虑到指令重复、指令之间有因果关系等情况，仅当读取完所有行之后，再进行总体校验及写入ret
     # “指定”回滚逻辑：
     #   指定了自己或组员
-    if force == user_id or force in excludes:
+    if force == ret['content']['user_id'] or force in excludes:
         force = ''
         ret['warnings'].append('指定失败: 项目相关人员')
         logger.warning('rallbacked force due to "in excludes"')
