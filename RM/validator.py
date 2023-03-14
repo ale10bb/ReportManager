@@ -1,5 +1,6 @@
 # -*- coding: UTF-8 -*-
 import os
+import shutil
 import logging
 import argparse
 import re
@@ -321,3 +322,32 @@ def read_XT13(work_path:str) -> dict:
                 
     logger.debug('return: {}'.format(ret))
     return ret
+
+
+def encrypt_document(work_path:str):
+    ''' 加密{work_path}下的所有word文档。
+
+    Args:
+        work_path: 工作目录
+
+    '''
+    logger = logging.getLogger(__name__)
+    logger.debug('args: {}'.format({'work_path': work_path}))
+    assert os.path.isdir(work_path), 'invalid arg: work_path'
+
+    # work_path中的所有doc和docx文件视作有效文档，但忽略临时文件
+    document_paths = file_paths(filtered_walk(work_path, included_files=['*.doc', '*.docx'], excluded_files=['~$*']))
+    word = win32com.client.gencache.EnsureDispatch('Word.Application')
+    for document_path in document_paths:
+        document = None
+        try:
+            document = word.Documents.Open(FileName=document_path)
+            document.SaveAs2(FileName=document_path + '.tmp')
+            document.Close(SaveChanges=0)
+            os.remove(document_path)
+            shutil.move(document_path + '.tmp', document_path)
+        except Exception as err:
+            logger.warning('encrypt failed', exc_info=True)
+        finally:
+            if document:
+                document.Close(SaveChanges=0)

@@ -303,6 +303,7 @@ def do_mail(check_results:dict=None):
             )
         ## 对于完成审核，将attachments_path重命名并移动至archive中，重名时清除上一条记录，同时删除temp中的提交审核记录
         if check_results['operator'] == 'finish':
+            RM.validator.encrypt_document(attachments_path)
             new_work_path = os.path.join(
                 storage, 
                 'archive', 
