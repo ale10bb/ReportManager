@@ -443,9 +443,9 @@ def user_info():
             g.ret['data']['user'] = dict(zip(keys, list(row) + [idx + 1]))
             break
     else:
-        keys = ['id', 'name', 'role', 'status']
+        keys = ['id', 'name', 'role']
         row = RM.mysql.t_user.fetch(user_id=g.user_id)
-        g.ret['data']['user'] = (dict(zip(keys, [row[0], row[1], row[4], row[5]])))
+        g.ret['data']['user'] = (dict(zip(keys, [row[0], row[1], row[4]])))
     return g.ret
 
 
