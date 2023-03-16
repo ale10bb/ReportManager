@@ -339,11 +339,13 @@ def encrypt_document(work_path:str):
     document_paths = file_paths(filtered_walk(work_path, included_files=['*.doc', '*.docx'], excluded_files=['~$*']))
     word = win32com.client.gencache.EnsureDispatch('Word.Application')
     for document_path in document_paths:
+        logger.debug('encrypting "%s"', document_path)
         document = None
         try:
             document = word.Documents.Open(FileName=document_path)
             document.SaveAs2(FileName=document_path + '.tmp')
             document.Close(SaveChanges=0)
+            document = None
             os.remove(document_path)
             shutil.move(document_path + '.tmp', document_path)
         except Exception as err:
