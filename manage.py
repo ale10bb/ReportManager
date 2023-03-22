@@ -418,6 +418,8 @@ def list_user():
     for item in g.ret['data']['user']:
         del item['phone']
         del item['email']
+        if item['role'] == 0:
+            del item['status']
     return g.ret
 
 
@@ -434,6 +436,8 @@ def search_user():
     for item in g.ret['data']['user']:
         del item['phone']
         del item['email']
+        if item['role'] == 0:
+            del item['status']
     return g.ret
 
 
@@ -455,9 +459,11 @@ def user_info():
             g.ret['data']['user']['priority'] = idx + 1
             break
     else:
-        g.ret['data']['user'] = mysql.t_user.fetch(user_id=g.user_id)
-        del g.ret['data']['user']['phone']
-        del g.ret['data']['user']['email']
+        ret = mysql.t_user.fetch(user_id=g.user_id)
+        if ret:
+            g.ret['data']['user'] = ret
+            del g.ret['data']['user']['phone']
+            del g.ret['data']['user']['email']
     return g.ret
 
 
