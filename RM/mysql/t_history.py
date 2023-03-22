@@ -54,7 +54,7 @@ def search(page_index: int = 1, page_size: int = 10, **kwargs) -> Histories:
                 condition += ' AND company LIKE %s'
         logger.debug('params: %s', params)
         logger.debug('condition: %s', condition)
-        sql = f"SELECT count(1) as history FROM current WHERE 1=1{condition}"
+        sql = f"SELECT count(1) as count FROM history WHERE 1=1{condition}"
         cursor.execute(sql, params)
         ret['total'] = int(cursor.fetchone()[0])
         sql = f'''
