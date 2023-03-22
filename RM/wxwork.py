@@ -1,55 +1,9 @@
 # -*- coding: UTF-8 -*-
-from typing import TypedDict
 import logging
 import json
 import requests
 from . import mysql
-
-
-class GETTOKEN_RESPONSE(TypedDict):
-    errcode: int
-    errmsg: str
-    access_token: str
-    expires_in: int
-
-
-class AGENT_GET_RESPONSE(TypedDict):
-    errcode: int
-    errmsg: str
-    agentid: int
-    name: str
-    square_logo_url: str
-    description: str
-    allow_userinfos: dict[str, list[dict[str, str]]]
-    allow_partys: dict[str, list[int]]
-    allow_tags: dict[str, list[int]]
-    close: int
-    redirect_domain: str
-    report_location_flag: int
-    isreportenter: int
-    home_url: str
-    customized_publish_status: int
-
-
-class MESSAGE_SEND_RESPONSE(TypedDict):
-    errcode: int
-    errmsg: str
-    invaliduser: str
-    invalidparty: str
-    invalidtag: str
-    unlicenseduser: str
-    msgid: str
-    response_code: str
-
-
-class GETUSERINFO_RESPONSE(TypedDict):
-    errcode: int
-    errmsg: str
-    userid: str
-    user_ticket: str
-    openid: str
-    external_userid: str
-
+from .types import *
 
 class WXWork:
     ''' WXWork的封装客户端，实现发送text消息的功能。

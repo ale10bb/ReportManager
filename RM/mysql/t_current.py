@@ -5,8 +5,8 @@ import logging
 import json
 import hashlib
 from .client import Transaction, Selection
-from .types import CurrentRecord, Currents
 from . import t_user
+from ..types import *
 
 
 def search(page_index: int = 1, page_size: int = 10, **kwargs) -> Currents:

@@ -3,12 +3,7 @@ from typing import TypedDict
 import logging
 import datetime
 from . import mysql
-from .mysql.types import CurrentRecord, HistoryRecord
-
-
-class Built_Message(TypedDict):
-    subject: str
-    content: str
+from .types import *
 
 
 def build_submit_mail(record: CurrentRecord, warnings: list[str]) -> Built_Message:

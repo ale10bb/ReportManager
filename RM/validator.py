@@ -2,37 +2,12 @@
 ''' 检查邮件及附件的有效性
 '''
 from typing import Literal
-from typing import TypedDict
 import logging
 import argparse
 import re
 from . import mysql
 from . import document
-
-
-class Content(TypedDict):
-    timestamp: int
-    user_id: str
-    name: str
-    urgent: bool
-    excludes: list[str]
-    force: str
-
-
-class Checked_Mail_Content(TypedDict):
-    warnings: list[str]
-    content: Content
-
-
-class Attachment(TypedDict):
-    pages: int
-    company: str
-    names: dict[str, str]
-
-
-class Checked_Mail_Attachment(TypedDict):
-    warnings: list[str]
-    attachment: Attachment
+from .types import *
 
 
 def check_mail_content(from_: str, subject: str, content: str, timestamp: int) -> Checked_Mail_Content:

@@ -4,7 +4,7 @@
 import logging
 import json
 from .client import Selection
-from .types import HistoryRecord, Histories
+from ..types import *
 
 
 def search(page_index: int = 1, page_size: int = 10, **kwargs) -> Histories:

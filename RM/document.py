@@ -9,7 +9,7 @@ from walkdir import filtered_walk, file_paths
 import win32com.client
 from docx import Document
 
-from .validator import Attachment
+from .types import *
 
 
 def read_document(work_path: str) -> Attachment:

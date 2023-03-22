@@ -6,7 +6,7 @@
 from typing import Literal
 import logging
 from .client import Transaction, Selection
-from .types import UserItem, QueueItem
+from ..types import *
 
 
 def search(**kwargs) -> list[UserItem]:

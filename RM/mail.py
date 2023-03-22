@@ -1,6 +1,4 @@
 # -*- coding: UTF-8 -*-
-from typing import Literal
-from typing import TypedDict
 import os
 import sys
 import logging
@@ -9,16 +7,7 @@ import zmail
 from email.header import Header
 from email.utils import formataddr, parseaddr
 from . import mysql
-
-
-class Parsed_Mail(TypedDict):
-    operator: Literal['submit', 'finish']
-    keyword: str
-    timestamp: int
-    from_: str
-    subject: str
-    content: str
-    temp_path: str
+from .types import *
 
 
 class Mail:

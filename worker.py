@@ -13,9 +13,7 @@ from RM.dingtalk import Dingtalk
 from RM.mail import Mail
 from RM.redis import RedisStream
 from RM.wxwork import WXWork
-
-from RM.mail import Parsed_Mail
-from RM.validator import Content, Attachment
+from RM.types import *
 
 
 def init(config):

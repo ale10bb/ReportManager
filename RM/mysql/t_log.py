@@ -5,8 +5,7 @@ from typing import Literal
 import logging
 import json
 from .client import Transaction
-from ..mail import Parsed_Mail
-from ..validator import Content, Attachment
+from ..types import *
 
 
 def add_mail(warnings: list[str], err: str | None, parsed_mail: Parsed_Mail, content: Content, attachment: Attachment):
