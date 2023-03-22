@@ -1,9 +1,11 @@
 # -*- coding: UTF-8 -*-
 import logging
 import json
+import datetime
 import requests
 from . import mysql
 from .types import *
+
 
 class WXWork:
     ''' WXWork的封装客户端，实现发送text消息的功能。
@@ -13,6 +15,7 @@ class WXWork:
     _agentid: int = 0
     _secret: str = ''
     _access_token: str = ''
+    _access_token_expire = datetime.datetime.fromtimestamp(0)
     _admin_userid: str = ''
 
     def __init__(self, corpid: str, agentid: int, secret: str, admin_userid: str = ''):
@@ -36,6 +39,8 @@ class WXWork:
         if r1['errcode']:
             raise ValueError(f"Cannot init wxwork: {r1['errmsg']}.")
         self._access_token = r1['access_token']
+        self._access_token_expire = datetime.datetime.now() + \
+            datetime.timedelta(seconds=r1['expires_in'] - 600)
         url = f"https://qyapi.weixin.qq.com/cgi-bin/agent/get?access_token={self._access_token}&agentid={agentid}"
         r2: AGENT_GET_RESPONSE = session.get(url).json()
         logger.debug('agent/get response: %s', r2)
@@ -55,6 +60,8 @@ class WXWork:
         '''
         logger = logging.getLogger(__name__)
 
+        if datetime.datetime.now() < self._access_token_expire:
+            return
         session = requests.session()
         url = f"https://qyapi.weixin.qq.com/cgi-bin/gettoken?corpid={self._corpid}&corpsecret={self._secret}"
         for _ in range(3):
@@ -124,7 +131,7 @@ class WXWork:
             host(str): 跳转的host（默认HTTPS）
         '''
         logger = logging.getLogger(__name__)
-        logger.debug('args: %s', {host: host})
+        logger.debug('args: %s', {'host': host})
 
         redirect_uri = f"https%3A%2F%2F{host}%2Fauth"
         url = f"https://open.weixin.qq.com/connect/oauth2/authorize?appid={self._corpid}&" \
