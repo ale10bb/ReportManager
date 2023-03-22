@@ -3,12 +3,10 @@
 '''
 import os
 import shutil
-import sys
 import logging
 import re
 from walkdir import filtered_walk, file_paths
-if sys.platform == 'win32':
-    import win32com.client
+import win32com.client
 from docx import Document
 
 from .validator import Attachment

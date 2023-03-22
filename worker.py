@@ -7,8 +7,13 @@ import shutil
 import datetime
 from walkdir import filtered_walk, file_paths, dir_paths
 
+from RM import mysql, document, notification, validator
+from RM.archive import Archive
+from RM.dingtalk import Dingtalk
+from RM.mail import Mail
+from RM.redis import RedisStream
+from RM.wxwork import WXWork
 
-import RM
 from RM.mail import Parsed_Mail
 from RM.validator import Content, Attachment
 
@@ -77,7 +82,7 @@ def init(config):
                 )
 
     # ---mysql---
-    RM.mysql.init(
+    mysql.init(
         user=config.get('mysql', 'user', fallback='rm'),
         password=config.get('mysql', 'pass', fallback='rm'),
         host=config.get('mysql', 'host', fallback='127.0.0.1'),
@@ -87,7 +92,7 @@ def init(config):
 
     # ---redis---
     global stream
-    stream = RM.RedisStream(
+    stream = RedisStream(
         host=config.get('redis', 'host', fallback='127.0.0.1'),
         password=config.get('redis', 'pass', fallback='rm'),
     )
@@ -110,7 +115,7 @@ def init(config):
         'ssl': config.getboolean('smtp', 'ssl', fallback=False),
         'tls': config.getboolean('smtp', 'tls', fallback=False),
     }
-    mail = RM.Mail(
+    mail = Mail(
         pop3_config,
         smtp_config,
         config.get('mail', 'domain', fallback='example.com'),
@@ -125,7 +130,7 @@ def init(config):
         'unrar': config.get('archive', 'unrar_bin', fallback='unrar'),
         'unar': config.get('archive', 'unar_bin', fallback='unar')
     }
-    archive = RM.Archive(bin_path, config.get('archive', 'pass', fallback=''))
+    archive = Archive(bin_path, config.get('archive', 'pass', fallback=''))
 
     # ---dingtalk---
     global dingtalk
@@ -137,7 +142,7 @@ def init(config):
         'webhook': config.get('dingtalk', 'webhook_debug', fallback=''),
         'secret': config.get('dingtalk', 'secret_debug', fallback='')
     }
-    dingtalk = RM.Dingtalk(
+    dingtalk = Dingtalk(
         chatbot,
         chatbot_debug,
         config.get('dingtalk', 'attend', fallback=''),
@@ -146,7 +151,7 @@ def init(config):
 
     # ---wxwork---
     global wxwork
-    wxwork = RM.WXWork(
+    wxwork = WXWork(
         config.get('wxwork', 'corpid', fallback=''),
         config.getint('wxwork', 'agentid', fallback=0),
         config.get('wxwork', 'secret', fallback=''),
@@ -173,7 +178,7 @@ def do_mail(parsed_mail: Parsed_Mail):
     # 错误时直接终止处理
     check_result = {'warnings': [], 'content': {}, 'attachment': {}}
     try:
-        ret = RM.validator.check_mail_content(
+        ret = validator.check_mail_content(
             parsed_mail['from_'],
             parsed_mail['subject'],
             parsed_mail['content'],
@@ -185,7 +190,7 @@ def do_mail(parsed_mail: Parsed_Mail):
             check_result['warnings'].append(
                 f"解压失败：\"{os.path.basename(item)}\"")
         #   未从附件中读取到有效文档
-        ret = RM.validator.check_mail_attachment(
+        ret = validator.check_mail_attachment(
             os.path.join(parsed_mail['temp_path'], 'attachments'), parsed_mail['operator'])
         check_result['attachment'] = ret['attachment']
         check_result['warnings'] += ret['warnings']
@@ -223,7 +228,7 @@ def do_mail(parsed_mail: Parsed_Mail):
         raise
     finally:
         exc_type, exc_value, exc_traceback = sys.exc_info()
-        RM.mysql.t_log.add_mail(
+        mysql.t_log.add_mail(
             check_result['warnings'],
             str(exc_value),
             parsed_mail,
@@ -256,12 +261,12 @@ def handle_submit(work_path: str, content: Content, attachment: Attachment, warn
         reviewer_id = content['force']
     else:
         # 否则获取下一顺位的审核人，传入的excludes拼接了组员和自己
-        reviewer_id = RM.mysql.t_user.pop(
+        reviewer_id = mysql.t_user.pop(
             excludes=content['excludes'] +
             [content['user_id']],
             urgent=content['urgent'],
         )[0]['id']
-    RM.mysql.t_current.add(
+    mysql.t_current.add(
         attachment['names'],
         attachment['company'],
         attachment['pages'],
@@ -271,7 +276,7 @@ def handle_submit(work_path: str, content: Content, attachment: Attachment, warn
         content['timestamp'],
     )
     # 从current表中取回操作结果record
-    record = RM.mysql.t_current.fetch_by_name(attachment['names'])
+    record = mysql.t_current.fetch_by_name(attachment['names'])
     if not record:
         raise RuntimeError('Cannot fetch record.')
     logger.debug('record: %s', record)
@@ -279,7 +284,7 @@ def handle_submit(work_path: str, content: Content, attachment: Attachment, warn
                 record['authorid'], record['reviewerid'])
     # 生成XT13
     for code, project_name in record['names'].items():
-        RM.document.gen_XT13(
+        document.gen_XT13(
             record['authorname'],
             code,
             project_name,
@@ -306,23 +311,23 @@ def handle_submit(work_path: str, content: Content, attachment: Attachment, warn
     shutil.rmtree(work_path)
     archive_path = archive.archive(
         new_work_path, '+'.join(sorted(record['names'])))
-    message = RM.notification.build_submit_mail(record, warnings)
+    message = notification.build_submit_mail(record, warnings)
     mail.send(
-        RM.mysql.t_user.fetch(record['reviewerid'])['email'],
+        mysql.t_user.fetch(record['reviewerid'])['email'],
         message['subject'],
         message['content'],
         archive_path,
         to_stdout=debug,
     )
     os.remove(archive_path)
-    message = RM.notification.build_submit_dingtalk(record, warnings)
+    message = notification.build_submit_dingtalk(record, warnings)
     dingtalk.send_markdown(
         message['subject'],
         message['content'],
-        RM.mysql.t_user.fetch(record['reviewerid'])['phone'],
+        mysql.t_user.fetch(record['reviewerid'])['phone'],
         to_stdout=debug,
     )
-    message = RM.notification.build_submit_wxwork(record, warnings)
+    message = notification.build_submit_wxwork(record, warnings)
     wxwork.send_text(
         message['content'],
         [record['authorid'], record['reviewerid']],
@@ -349,11 +354,11 @@ def handle_finish(work_path: str, content: Content, attachment: Attachment, warn
 
     attachments_path = os.path.join(work_path, 'attachments')
     #   在current表中删除项目
-    RM.mysql.t_current.finish_by_name(
+    mysql.t_current.finish_by_name(
         attachment['names'], content['timestamp'])
     # 从history中取回操作结果record
     # 由于插入history时不检测唯一性，search结果可能重复。在此取第一个结果作为有效返回
-    record = RM.mysql.t_history.search(
+    record = mysql.t_history.search(
         page_size=1,
         code='+'.join(attachment['names'])
     )['history'][0]
@@ -387,13 +392,13 @@ def handle_finish(work_path: str, content: Content, attachment: Attachment, warn
         shutil.rmtree(dir_path)
     # 加密文件
     for document_path in file_paths(filtered_walk(new_work_path, included_files=['*.doc', '*.docx'])):
-        RM.document.encrypt(document_path)
+        document.encrypt(document_path)
 
     archive_path = archive.archive(
         new_work_path, '+'.join(sorted(record['names'])))
-    message = RM.notification.build_finish_mail(record, warnings)
+    message = notification.build_finish_mail(record, warnings)
     mail.send(
-        RM.mysql.t_user.fetch(record['authorid'])['email'],
+        mysql.t_user.fetch(record['authorid'])['email'],
         message['subject'],
         message['content'],
         archive_path,
@@ -401,14 +406,14 @@ def handle_finish(work_path: str, content: Content, attachment: Attachment, warn
         needs_cc=True,
     )
     os.remove(archive_path)
-    message = RM.notification.build_finish_dingtalk(record, warnings)
+    message = notification.build_finish_dingtalk(record, warnings)
     dingtalk.send_markdown(
         message['subject'],
         message['content'],
-        RM.mysql.t_user.fetch(record['authorid'])['phone'],
+        mysql.t_user.fetch(record['authorid'])['phone'],
         to_stdout=debug,
     )
-    message = RM.notification.build_finish_wxwork(record, warnings)
+    message = notification.build_finish_wxwork(record, warnings)
     wxwork.send_text(
         message['content'],
         [record['authorid'], record['reviewerid']],
@@ -426,14 +431,14 @@ def do_resend(id: str | int, redirect: str = ''):
     logger = logging.getLogger(__name__)
     logger.debug('args: %s', {'id': id, 'redirect': redirect})
     if isinstance(id, int):
-        record = RM.mysql.t_history.fetch(id)
+        record = mysql.t_history.fetch(id)
     elif isinstance(id, str):
-        record = RM.mysql.t_current.fetch(id)
+        record = mysql.t_current.fetch(id)
     else:
         raise TypeError('invalid arg: id')
     if not record:
         raise ValueError('invalid arg: id')
-    if not isinstance(redirect, str) or not RM.mysql.t_user.__contains__(redirect):
+    if not isinstance(redirect, str) or not mysql.t_user.__contains__(redirect):
         logger.warning('invalid arg: redirect')
         redirect = ''
 
@@ -450,14 +455,14 @@ def do_resend(id: str | int, redirect: str = ''):
 
     # 对于current中获取的target，重发[分配审核]
     if isinstance(record['id'], str):
-        resend_notification = RM.notification.build_submit_mail(record, [])
+        resend_notification = notification.build_submit_mail(record, [])
         resend_notification['subject'] = '(resend) ' + \
             resend_notification['subject']
         to = redirect if redirect else record['reviewerid']
         logger.info('resending "%s" (分配审核) to "%s"', codes, to)
     # 对于history中获取的target，重发[完成审核]
     else:
-        resend_notification = RM.notification.build_finish_mail(record, [])
+        resend_notification = notification.build_finish_mail(record, [])
         resend_notification['subject'] = '(resend) ' + \
             resend_notification['subject']
         to = redirect if redirect else record['authorid']

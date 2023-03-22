@@ -12,7 +12,11 @@ import ipaddress
 import datetime
 import chinese_calendar
 
-import RM
+from RM import mysql
+from RM.dingtalk import Dingtalk
+from RM.redis import RedisStream
+from RM.wxwork import WXWork
+
 
 app = Flask(__name__)
 app.config['JSON_AS_ASCII'] = False
@@ -66,7 +70,7 @@ def before_first_request():
     logging.config.dictConfig(dict_config)
 
     # ---mysql---
-    RM.mysql.init(
+    mysql.init(
         user=config.get('mysql', 'user', fallback='rm'),
         password=config.get('mysql', 'pass', fallback='rm'),
         host=config.get('mysql', 'host', fallback='127.0.0.1'),
@@ -76,7 +80,7 @@ def before_first_request():
 
     # ---redis---
     global stream
-    stream = RM.RedisStream(
+    stream = RedisStream(
         host=config.get('redis', 'host', fallback='127.0.0.1'),
         password=config.get('redis', 'pass', fallback='rm'),
     )
@@ -91,7 +95,7 @@ def before_first_request():
         'webhook': config.get('dingtalk', 'webhook_debug', fallback=''),
         'secret': config.get('dingtalk', 'secret_debug', fallback='')
     }
-    dingtalk = RM.Dingtalk(
+    dingtalk = Dingtalk(
         chatbot,
         chatbot_debug,
         config.get('dingtalk', 'attend', fallback=''),
@@ -100,7 +104,7 @@ def before_first_request():
 
     # ---wxwork---
     global wxwork
-    wxwork = RM.WXWork(
+    wxwork = WXWork(
         config.get('wxwork', 'corpid', fallback=''),
         config.getint('wxwork', 'agentid', fallback=0),
         config.get('wxwork', 'secret', fallback=''),
@@ -112,12 +116,12 @@ def do_attend():
     ''' 打卡提醒函数的主入口。调用后向主通知群发送打卡提示，包含当前任务、分配队列和交互入口。向企业微信发送任务提醒。
     '''
     # 准备通知所需数据
-    currents = RM.mysql.t_current.search(page_size=9999)['current']
+    currents = mysql.t_current.search(page_size=9999)['current']
     # 24小时没有动作的情况下跳过信息输出
-    if not currents and (datetime.datetime.now().timestamp() - RM.mysql.t_history.pop()['end'] > 86400):
+    if not currents and (datetime.datetime.now().timestamp() - mysql.t_history.pop()['end'] > 86400):
         app.logger.debug('skipped output')
         return
-    queue = RM.mysql.t_user.pop(count=9999, hide_busy=False)
+    queue = mysql.t_user.pop(count=9999, hide_busy=False)
     currents_group_by_user_id = {user['id']: [] for user in queue}
     for record in currents:
         currents_group_by_user_id[record['authorid']].append(
@@ -210,7 +214,7 @@ def jwt_required():
                 param.update(request.json)
             except:
                 pass
-            RM.mysql.t_log.add_manage(
+            mysql.t_log.add_manage(
                 g.client_ip,
                 g.user_id,
                 request.headers.get('User-Agent', ''),
@@ -226,7 +230,7 @@ def jwt_required():
 def auth():
     code = request.json.get('code', '')
     user_id = wxwork.get_userid(code)
-    if RM.mysql.t_user.__contains__(user_id):
+    if mysql.t_user.__contains__(user_id):
         app.logger.info('grant access to "%s"', user_id)
         g.ret['data']['token'] = create_access_token(identity=user_id)
         return g.ret
@@ -238,7 +242,7 @@ def auth():
 
 @app.route('/utils/genToken')
 def genToken():
-    user_info = RM.mysql.t_user.fetch(request.args['user_id'])
+    user_info = mysql.t_user.fetch(request.args['user_id'])
     if user_info:
         return create_access_token(identity=user_info['id'], expires_delta=datetime.timedelta(days=1))
     else:
@@ -261,7 +265,7 @@ def cron():
         case 'attend':
             if chinese_calendar.is_workday(current):
                 do_attend()
-                RM.mysql.t_user.reset_status()
+                mysql.t_user.reset_status()
                 stream.trim()
         case _:
             abort(400, 'Inappropriate argument: type')
@@ -334,11 +338,11 @@ def search_history():
         elif key == 'author':
             if not isinstance(value, str):
                 abort(400, 'Inappropriate argument: author')
-            user = RM.mysql.t_user.fetch(value)
+            user = mysql.t_user.fetch(value)
             if user:
                 kwargs['authorid'] = user['id']
             else:
-                users = RM.mysql.t_user.search(name=value)
+                users = mysql.t_user.search(name=value)
                 if len(users) == 1:
                     kwargs['authorid'] = users[0]['id']
         elif key == 'current':
@@ -349,7 +353,7 @@ def search_history():
             if not isinstance(value, int):
                 abort(400, 'Inappropriate argument: pageSize')
             kwargs['page_size'] = value
-    g.ret['data'] = RM.mysql.t_history.search(**kwargs)
+    g.ret['data'] = mysql.t_history.search(**kwargs)
     return g.ret
 
 
@@ -357,13 +361,13 @@ def search_history():
 @jwt_required()
 def list_current():
     g.ret['data'] = {'current': [], 'total': 0}
-    ret = RM.mysql.t_current.search(
+    ret = mysql.t_current.search(
         page_size=9999,
         authorid=g.user_id,
     )
     g.ret['data']['current'].extend(ret['current'])
     g.ret['data']['total'] += ret['total']
-    ret = RM.mysql.t_current.search(
+    ret = mysql.t_current.search(
         page_size=9999,
         reviewerid=g.user_id,
     )
@@ -391,7 +395,7 @@ def edit_current():
             if not isinstance(value, bool):
                 abort(400, 'Inappropriate argument: urgent')
             kwargs['urgent'] = value
-    RM.mysql.t_current.edit(request.json['id'], **kwargs)
+    mysql.t_current.edit(request.json['id'], **kwargs)
     return g.ret
 
 
@@ -400,7 +404,7 @@ def edit_current():
 def delete_current():
     if not isinstance(request.json['id'], str):
         abort(400, 'Inappropriate argument: id')
-    RM.mysql.t_current.delete(request.json['id'])
+    mysql.t_current.delete(request.json['id'])
     return g.ret
 
 
@@ -410,7 +414,7 @@ def list_user():
     kwargs = {}
     if request.json.get('isReviewer') == True:
         kwargs['only_reviewer'] = True
-    g.ret['data']['user'] = RM.mysql.t_user.search(**kwargs)
+    g.ret['data']['user'] = mysql.t_user.search(**kwargs)
     for item in g.ret['data']['user']:
         del item['phone']
         del item['email']
@@ -426,7 +430,7 @@ def search_user():
             if not isinstance(value, str):
                 abort(400, f'Inappropriate argument: {key}')
             kwargs[key] = value
-    g.ret['data']['user'] = RM.mysql.t_user.search(**kwargs)
+    g.ret['data']['user'] = mysql.t_user.search(**kwargs)
     for item in g.ret['data']['user']:
         del item['phone']
         del item['email']
@@ -436,14 +440,14 @@ def search_user():
 @app.route('/api/queue/list', methods=['POST'])
 @jwt_required()
 def list_queue():
-    g.ret['data']['queue'] = RM.mysql.t_user.pop(count=9999, hide_busy=False)
+    g.ret['data']['queue'] = mysql.t_user.pop(count=9999, hide_busy=False)
     return g.ret
 
 
 @app.route('/api/user/info', methods=['POST'])
 @jwt_required()
 def user_info():
-    for idx, item in enumerate(RM.mysql.t_user.pop(count=9999, hide_busy=False)):
+    for idx, item in enumerate(mysql.t_user.pop(count=9999, hide_busy=False)):
         if item['id'] == g.user_id:
             g.ret['data']['user'] = item
             del g.ret['data']['user']['phone']
@@ -451,7 +455,7 @@ def user_info():
             g.ret['data']['user']['priority'] = idx + 1
             break
     else:
-        g.ret['data']['user'] = RM.mysql.t_user.fetch(user_id=g.user_id)
+        g.ret['data']['user'] = mysql.t_user.fetch(user_id=g.user_id)
         del g.ret['data']['user']['phone']
         del g.ret['data']['user']['email']
     return g.ret
@@ -462,7 +466,7 @@ def user_info():
 def user_status():
     if not request.json['status'] in [0, 1, 2]:
         abort(400, 'Inappropriate argument: status')
-    RM.mysql.t_user.set_status(g.user_id, request.json['status'])
+    mysql.t_user.set_status(g.user_id, request.json['status'])
     return g.ret
 
 
