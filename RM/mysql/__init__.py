@@ -1,15 +1,17 @@
 ''' MySQL的封装客户端，实现连接池管理及表操作
 '''
-from . import t_audit, t_current, t_history, t_log, t_user
+import logging
+from mysql.connector.pooling import MySQLConnectionPool
+from mysql.connector.cursor import MySQLCursorBuffered
+from . import t_current, t_history, t_log, t_user
+from . import var
+
 
 def init(**kwargs):
-    import logging
-    import mysql.connector.pooling
-    from . import var
     logger = logging.getLogger(__name__)
-    var.pool = mysql.connector.pooling.MySQLConnectionPool(pool_name = 'RM', pool_size = 3, **kwargs)
+    var.pool = MySQLConnectionPool(pool_name='RM', **kwargs)
     test_cnx = var.pool.get_connection()
-    test_cursor = test_cnx.cursor(buffered=True)
+    test_cursor: MySQLCursorBuffered = test_cnx.cursor(buffered=True)
     test_cursor.execute('''
         SELECT id, name, phone, email, role, pages, available, status, status_since
         FROM user 
@@ -32,5 +34,6 @@ def init(**kwargs):
         LIMIT 1
     ''')
     test_cursor.close()
-    logger.info('MySQL configration ({}@{}) confirmed.'.format(test_cnx.user, test_cnx.server_host))
+    logger.info(
+        'MySQL configration (%s@%s) confirmed.', test_cnx.user, test_cnx.server_host)
     test_cnx.close()

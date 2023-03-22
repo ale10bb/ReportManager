@@ -1,94 +1,96 @@
 # -*- coding: UTF-8 -*-
+''' histroy表增删改查逻辑
+'''
 import logging
-from .client import Transaction
-from . import var
+import json
+from .client import Selection
+from .types import HistoryRecord, Histories
 
-# -------------------------------------
-#          histroy增删改查逻辑
-# -------------------------------------
-# 注：仅可由命令逻辑调用，默认参数均为合法
 
-def search(code:str='', name:str='', company:str='', author_id:str='', page_index:int=1, page_size:int=10) -> dict:
+def search(page_index: int = 1, page_size: int = 10, **kwargs) -> Histories:
     ''' 搜索history表中的项目。
 
-    1. 按照code模糊查询history中的所有项目，写入ret['all']；支持按“+”分割传入多个code，查询结果包含code的超集；
-    2. 单条记录返回尽可能多的数据，顺序为(id, authorid, authorname, reviewerid, reviewername, start, end, pages, urgent, company, names)
+    1. 传入code时，按条件模糊查询；支持按“+”分割传入多个code，如"123+345"
+    2. 传入authorid/reviewerid时，按条件精准查询
+    3. 传入name/company时，按条件模糊查询
 
     Args:
-        code(str): 项目编号（可选/默认值空）
-        name(str): 项目名称（可选/默认值空）
-        company(str): 委托单位（可选/默认值空）
-        author_id(str): 作者ID（可选/默认值空）
         page_index(int): 分页/当前页（可选/默认值1）
         page_size(int): 分页/页大小（可选/默认值10）
+        kwargs -> code(str): 项目编号
+        kwargs -> authorid(str): 撰写人id（精确查询）
+        kwargs -> reviewerid(str): 审核人id（精确查询）
+        kwargs -> name(str): 项目名称
+        kwargs -> company(str): 委托单位
 
     Returns:
-        {'all': [], 'total': int}
-
-    Raises:
-        AssertionError: 如果参数类型非法
+        {'history': list[HistoryRecord], 'total': int}
     '''
     logger = logging.getLogger(__name__)
-    logger.debug('args: {}'.format({'code': code, 'name': name, 'company': company, 'author_id': author_id}))
-    assert type(code) == str, 'invalid arg: code'
-    assert type(name) == str, 'invalid arg: name'
-    assert type(company) == str, 'invalid arg: company'
-    assert type(author_id) == str, 'invalid arg: author_id'
-    assert type(page_index) == int, 'invalid arg: page_index'
-    assert type(page_size) == int, 'invalid arg: page_size'
+    logger.debug('args: %s', {
+        'page_index': page_index,
+        'page_size': page_size,
+        'kwargs': kwargs,
+    })
 
-    ret = {'all': [], 'total': 0}
-    with Transaction(var.pool) as cursor:
-        inputCodes = set(['%{}%'.format(item) for item in code.split('+')])
-        codes_condition = ' AND '.join(['JSON_SEARCH(JSON_KEYS(names), \'one\', %s) IS NOT NULL'] * len(inputCodes)) + ' AND '
-        cursor.execute('''
-            SELECT count(1) FROM history WHERE {}JSON_SEARCH(names, 'one', %s) IS NOT NULL AND company LIKE %s AND authorid LIKE %s
-            '''.format(codes_condition), (
-                list(inputCodes) + ['%{}%'.format(name), '%{}%'.format(company), '%{}%'.format(author_id)]
-            )
-        )
-        logger.debug(cursor.statement)
-        ret['total'] = cursor.fetchone()[0]
-        cursor.execute('''
+    ret: Histories = {'history': [], 'total': 0}
+    with Selection() as cursor:
+        params = []
+        condition = ''
+        for key, value in kwargs.items():
+            if key == 'code':
+                codes = list(set([f'%{item}%' for item in value.split('+')]))
+                params.extend(codes)
+                condition += ''.join(
+                    [' AND JSON_SEARCH(JSON_KEYS(names), \'one\', %s) IS NOT NULL'] * len(codes))
+            if key in ['authorid', 'reviewerid']:
+                params.append(value)
+                condition += f' AND {key} = %s'
+            if key == 'name':
+                params.append(f'%{value}%')
+                condition += ' AND JSON_SEARCH(names, \'one\', %s) IS NOT NULL'
+            if key == 'company':
+                params.append(f'%{value}%')
+                condition += ' AND company LIKE %s'
+        logger.debug('params: %s', params)
+        logger.debug('condition: %s', condition)
+        sql = f"SELECT count(1) as history FROM current WHERE 1=1{condition}"
+        cursor.execute(sql, params)
+        ret['total'] = int(cursor.fetchone()[0])
+        sql = f'''
             SELECT h.id, u_a.id, u_a.name, u_r.id, u_r.name, UNIX_TIMESTAMP(h.start), UNIX_TIMESTAMP(h.end), h.pages, h.urgent, h.company, h.names
             FROM history h
             LEFT JOIN user u_a ON h.authorid = u_a.id
             LEFT JOIN user u_r ON h.reviewerid = u_r.id 
-            WHERE {}JSON_SEARCH(names, 'one', %s) IS NOT NULL AND company LIKE %s AND authorid LIKE %s 
-            ORDER BY h.id DESC
+            WHERE 1=1{condition}
             LIMIT %s OFFSET %s
-            '''.format(codes_condition), (list(inputCodes) + [
-                '%{}%'.format(name), 
-                '%{}%'.format(company), 
-                '%{}%'.format(author_id),
-                page_size,
-                page_size * (page_index - 1)
-            ])
-        )
-        logger.debug(cursor.statement)
-        ret['all'] = cursor.fetchall()
-
-    logger.debug('return: {}'.format(ret))
+        '''
+        cursor.execute(sql, params + [page_size, page_size * (page_index - 1)])
+        keys = ['id', 'authorid', 'authorname', 'reviewerid', 'reviewername',
+                'start', 'end', 'pages', 'urgent', 'company', 'names']
+        for row in cursor.fetchall():
+            d = HistoryRecord(zip(keys, row))
+            d['names'] = json.loads(d['names'])
+            d['urgent'] = bool(d['urgent'])
+            ret['history'].append(d)
+    logger.debug('return: %s', ret)
     return ret
 
 
-def fetch(history_id:int) -> tuple:
+def fetch(history_id: int) -> HistoryRecord | None:
     ''' 按照history_id查询对应项目的信息
 
     Args:
         history_id(int): 项目ID
 
     Returns:
-        (id, authorid, authorname, reviewerid, reviewername, start, end, pages, urgent, company, names)
-
-    Raises:
-        AssertionError: 如果参数类型非法
+        HistoryRecord | None
     '''
     logger = logging.getLogger(__name__)
-    logger.debug('args: {}'.format({'history_id': history_id}))
-    assert type(history_id) == int, 'invalid arg: history_id'
+    logger.debug('args: {}', {'history_id': history_id})
 
-    with Transaction(var.pool) as cursor:
+    ret: HistoryRecord | None = None
+    with Selection() as cursor:
         cursor.execute('''
             SELECT h.id, u_a.id, u_a.name, u_r.id, u_r.name, UNIX_TIMESTAMP(h.start), UNIX_TIMESTAMP(h.end), h.pages, h.urgent, h.company, h.names
             FROM history h
@@ -97,22 +99,27 @@ def fetch(history_id:int) -> tuple:
             WHERE h.id = %s
             ''', (history_id,)
         )
-        logger.debug(cursor.statement)
         row = cursor.fetchone()
+        if row:
+            keys = ['id', 'authorid', 'authorname', 'reviewerid', 'reviewername',
+                    'start', 'end', 'pages', 'urgent', 'company', 'names']
+            ret = HistoryRecord(zip(keys, row))
+            ret['names'] = json.loads(ret['names'])
+            ret['urgent'] = bool(ret['urgent'])
+    logger.debug('return: %s', ret)
+    return ret
 
-    logger.debug('return: {}'.format(row))
-    return row
 
-
-def pop() -> tuple:
-    ''' 获取history表中的最新一条记录。
+def pop() -> HistoryRecord | None:
+    ''' 获取history表中的最新一条记录
 
     Returns:
-        tuple(id, authorid, authorname, reviewerid, reviewername, start, end, pages, urgent, company, names)
+        HistoryRecord | None
     '''
     logger = logging.getLogger(__name__)
 
-    with Transaction(var.pool) as cursor:
+    ret: HistoryRecord | None = None
+    with Selection() as cursor:
         cursor.execute('''
             SELECT h.id, u_a.id, u_a.name, u_r.id, u_r.name, UNIX_TIMESTAMP(h.start), UNIX_TIMESTAMP(h.end), h.pages, h.urgent, h.company, h.names
             FROM history h
@@ -120,13 +127,16 @@ def pop() -> tuple:
             LEFT JOIN user u_r ON h.reviewerid = u_r.id 
             ORDER BY h.id DESC
             LIMIT 1
-            '''
-        )
-        logger.debug(cursor.statement)
+            ''')
         row = cursor.fetchone()
-
-    logger.debug('return: {}'.format(row))
-    return row
+        if row:
+            keys = ['id', 'authorid', 'authorname', 'reviewerid', 'reviewername',
+                    'start', 'end', 'pages', 'urgent', 'company', 'names']
+            ret = HistoryRecord(zip(keys, row))
+            ret['names'] = json.loads(ret['names'])
+            ret['urgent'] = bool(ret['urgent'])
+    logger.debug('return: %s', ret)
+    return ret
 
 
 # def analysis_procedure_1() -> list:

@@ -5,13 +5,14 @@ import sys
 import subprocess
 from walkdir import filtered_walk, file_paths
 
+
 class Archive:
     ''' 压缩包工具的封装客户端，实现压缩和解压缩的功能。
     '''
     _bin_path = {}
     _password = ''
 
-    def __init__(self, bin_path:dict={}, password:str=''):
+    def __init__(self, bin_path: dict | None = None, password: str = ''):
         ''' 初始化archive的可执行文件和密码
 
         Args:
@@ -19,53 +20,64 @@ class Archive:
             password(str): 默认解压/压缩密码
 
         Raises:
-            AssertionError: 如果参数无效
+            ValueError/TypeError: 如果参数无效
         '''
         logger = logging.getLogger(__name__)
 
+        if not bin_path:
+            bin_path = {}
         if sys.platform == 'win32':
-            bin_path.setdefault('winrar', 'C:\\Program Files\\WinRAR\\WinRAR.exe')
-            assert (os.path.exists(bin_path['winrar']) and 
-                subprocess.run(
-                    [os.path.join(os.path.dirname(bin_path['winrar']), 'Rar.exe'), '-iver'], 
-                    check=True, 
-                    capture_output=True
-                ).stdout and
-                subprocess.run(
-                    [os.path.join(os.path.dirname(bin_path['winrar']), 'UnRAR.exe'), '-iver'], 
-                    check=True, 
-                    capture_output=True
-                ).stdout
-            ), 'invalid arg: bin_path.winrar'
+            bin_path.setdefault(
+                'winrar', 'C:\\Program Files\\WinRAR\\WinRAR.exe')
+            if not os.path.exists(bin_path['winrar']):
+                raise ValueError('invalid arg: bin_path.winrar')
+            p = subprocess.run(
+                [os.path.join(os.path.dirname(
+                    bin_path['winrar']), 'Rar.exe'), '-iver'],
+                check=True,
+                capture_output=True,
+            )
+            logger.debug('Rar.exe stdout: %s', p.stdout.decode('utf-8'))
+            p = subprocess.run(
+                [os.path.join(os.path.dirname(bin_path['winrar']),
+                              'UnRAR.exe'), '-iver'],
+                check=True,
+                capture_output=True,
+            )
+            logger.debug('UnRAR.exe stdout: %s', p.stdout.decode('utf-8'))
             logger.info('Archive configration (win32 -> WinRAR) confirmed.')
         elif sys.platform == 'linux':
-            assert subprocess.run(
-                [bin_path.setdefault('rar', 'rar'), '-iver'], 
-                check=True, 
+            p = subprocess.run(
+                [bin_path.setdefault('rar', 'rar'), '-iver'],
+                check=True,
+                capture_output=True,
+            )
+            logger.debug('rar stdout: %s', p.stdout.decode('utf-8'))
+            p = subprocess.run(
+                [bin_path.setdefault('unrar', 'unrar'), '-iver'],
+                check=True,
                 capture_output=True
-            ).stdout, 'invalid arg: bin_path.rar'
-            assert subprocess.run(
-                [bin_path.setdefault('unrar', 'unrar'), '-iver'], 
-                check=True, 
+            )
+            logger.debug('unrar stdout: %s', p.stdout.decode('utf-8'))
+            p = subprocess.run(
+                [bin_path.setdefault('unar', 'unar'), '-v'],
+                check=True,
                 capture_output=True
-            ).stdout, 'invalid arg: bin_path.unrar'
-            assert subprocess.run(
-                [bin_path.setdefault('unar', 'unar'), '-v'], 
-                check=True, 
-                capture_output=True
-            ).stdout, 'invalid arg: bin_path.unar'
-            logger.info('Archive configration (Linux -> rar/unrar/unar) confirmed.')
+            )
+            logger.debug('unar stdout: %s', p.stdout.decode('utf-8'))
+            logger.info(
+                'Archive configration (Linux -> rar/unrar/unar) confirmed.')
         else:
             raise OSError('Unsupported platform')
         self._bin_path = bin_path
 
-        assert type(password) == str, 'invalid arg: password'
+        if not isinstance(password, str):
+            raise TypeError('invalid arg: password')
         if password:
             self._password = password
             logger.info('Archive password set.')
 
-
-    def archive(self, work_path:str, name:str='') -> str:
+    def archive(self, work_path: str, name: str = '') -> str:
         ''' 压缩{work_path}，若初始化了密码，则进行加密压缩。压缩包存放到工作目录下的{name}.rar。
 
         Args:
@@ -76,19 +88,20 @@ class Archive:
             str: 压缩包的绝对路径
 
         Raises:
-            AssertionError: 如果参数类型非法
+            ValueError: 如果参数类型非法
         '''
         logger = logging.getLogger(__name__)
-        logger.debug('args: {}'.format({'work_path': work_path, 'name': name}))
-        assert os.path.isdir(work_path), 'invalid arg: work_path'
-        assert type(name) == str, 'invalid arg: name'
+        logger.debug('args: %s', {'work_path': work_path, 'name': name})
+        if not os.path.isdir(work_path):
+            raise ValueError('invalid arg: work_path')
+        archive_name = os.path.basename(name) + '.rar' \
+            if name else os.path.basename(work_path) + '.rar'
 
-        archive_name = name + '.rar' if name else os.path.basename(work_path) + '.rar'
         abspath_archive = os.path.join(work_path, archive_name)
         # 在1核2G的云服务器时，rar有概率报错退出 (exit 2: 发生致命错误)
         # 猜测原因为OOM，多次尝试应该会减少错误概率
         for idx in range(3):
-            logger.debug('attempt {}'.format(idx + 1))
+            logger.debug('attempt %s', idx + 1)
             if sys.platform == 'win32':
                 p = subprocess.run([
                     self._bin_path['winrar'],
@@ -102,7 +115,8 @@ class Archive:
                     abspath_archive,
                     os.path.join(work_path, '*')
                 ], capture_output=True)
-                logger.debug('winrar output ({}):\n {}'.format(p.returncode, p.stdout.decode('utf-8')))
+                logger.debug('winrar output (%s):\n %s',
+                             p.returncode, p.stdout.decode('utf-8'))
             elif sys.platform == 'linux':
                 p = subprocess.run([
                     self._bin_path['rar'],
@@ -116,20 +130,20 @@ class Archive:
                     abspath_archive,
                     os.path.join(work_path, '*')
                 ], capture_output=True)
-                logger.debug('rar output ({}):\n {}'.format(p.returncode, p.stdout.decode('utf-8')))
+                logger.debug('rar output (%s):\n %s',
+                             p.returncode, p.stdout.decode('utf-8'))
             else:
                 raise OSError('Unsupported platform')
             if not p.returncode:
                 break
         else:
             p.check_returncode()
-        logger.debug('return: {}'.format(abspath_archive))
+        logger.debug('return: %s', abspath_archive)
         return abspath_archive
 
-
-    def extract(self, work_path:str) -> list:
+    def extract(self, work_path: str) -> list[str]:
         ''' 则尝试使用密码解压缩{work_path}下的所有压缩包（不递归）
-        
+
         解压时忽略压缩包的文件结构，自动删除解压成功的压缩包
 
         Args:
@@ -142,14 +156,15 @@ class Archive:
             AssertionError: 如果参数类型非法
         '''
         logger = logging.getLogger(__name__)
-        logger.debug('args: {}'.format({'work_path': work_path}))
-        assert os.path.isdir(work_path), 'invalid arg: work_path'
+        logger.debug('args: %s', {'work_path': work_path})
+        if not os.path.isdir(work_path):
+            raise ValueError('invalid arg: work_path')
 
         # 解压失败的压缩文件路径
         archives_with_error = []
         # 解压所有文件
         for item in file_paths(filtered_walk(work_path, included_files=['*.rar', '*.zip', '*.zipx', '*.7z'])):
-            logger.debug('extracting "{}"'.format(item))
+            logger.debug('extracting "%s"', item)
             if sys.platform == 'win32':
                 p = subprocess.run([
                     self._bin_path['winrar'],
@@ -160,7 +175,8 @@ class Archive:
                     item,
                     work_path
                 ], capture_output=True)
-                logger.debug('winrar output ({}):\n {}'.format(p.returncode, p.stdout.decode('utf-8')))
+                logger.debug('winrar output (%s):\n %s',
+                             p.returncode, p.stdout.decode('utf-8'))
             elif sys.platform == 'linux':
                 match os.path.splitext(item)[1]:
                     case '.rar':
@@ -173,10 +189,11 @@ class Archive:
                             item,
                             work_path
                         ], capture_output=True)
-                        logger.debug('unrar output ({}):\n {}'.format(p.returncode, p.stdout.decode('utf-8')))
+                        logger.debug('unrar output (%s):\n %s',
+                                     p.returncode, p.stdout.decode('utf-8'))
                     case _:
                         p = subprocess.run([
-                            self._bin_path['unar'],   
+                            self._bin_path['unar'],
                             '-D',                       # 忽略目录结构
                             '-e', 'gbk',                # （文件头不包含unicode信息时）使用gbk编码
                             '-p', self._password,         # '-p'只是传入一个密码，如果压缩包没有加密，则依然解压成功
@@ -184,7 +201,8 @@ class Archive:
                             '-o', work_path,            # 输出目录
                             item
                         ], capture_output=True)
-                        logger.debug('unar output ({}):\n {}'.format(p.returncode, p.stdout.decode('utf-8')))
+                        logger.debug('unar output (%s):\n %s',
+                                     p.returncode, p.stdout.decode('utf-8'))
             else:
                 raise OSError('Unsupported platform')
             # 删除解压正常的压缩包
@@ -192,7 +210,7 @@ class Archive:
                 archives_with_error.append(item)
             else:
                 os.remove(item)
-                logger.debug('removed "{}"'.format(item))   
+                logger.debug('removed "%s"', item)
 
-        logger.debug('return: {}'.format(archives_with_error))
+        logger.debug('return: %s', archives_with_error)
         return archives_with_error

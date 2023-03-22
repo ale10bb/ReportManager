@@ -1,5 +1,8 @@
 # -*- coding: UTF-8 -*-
+from typing import Literal
+from typing import TypedDict
 import os
+import sys
 import logging
 import datetime
 import zmail
@@ -7,229 +10,253 @@ from email.header import Header
 from email.utils import formataddr, parseaddr
 from . import mysql
 
+
+class Parsed_Mail(TypedDict):
+    operator: Literal['submit', 'finish']
+    keyword: str
+    timestamp: int
+    from_: str
+    subject: str
+    content: str
+    temp_path: str
+
+
 class Mail:
     ''' zmail的封装客户端，实现邮件收发
     '''
     _pop3_config = {}
     _smtp_config = {}
-    _mail_config = {}
+    _default_domain = ''
+    _default_cc = ''
 
-    def __init__(self, pop3_config:dict={}, smtp_config:dict={}, mail_config:dict={}):
+    def __init__(self, pop3_config: dict | None = None, smtp_config: dict | None = None, default_domain: str = 'example.com', default_cc: str = ''):
         ''' 初始化mail的配置
 
         Args:
             pop3_config(dict): 需包含'username'、'password'、'host'、'port'、'ssl'、'tls'
             smtp_config(dict): 需包含'username'、'password'、'host'、'port'、'ssl'、'tls'
-            mail_config(dict): 需包含'default_domain'、'default_cc'
+            default_domain(str): 白名单邮箱域名
+            default_cc(str): 默认抄送者
 
         Raises:
-            AssertionError: 如果参数无效
+            ValueError/TypeError: 如果参数无效
         '''
         logger = logging.getLogger(__name__)
 
-        ## pop3，连接失败则抛出异常
-        assert zmail.server(
-            username=pop3_config.setdefault('username', 'rm@example.com'), 
-            password=pop3_config.setdefault('password', 'rm'), 
-            pop_host=pop3_config.setdefault('host', 'example.com'), 
+        # pop3，连接失败则抛出异常
+        if not pop3_config:
+            pop3_config = {}
+        if not zmail.server(
+            username=pop3_config.setdefault('username', 'rm@example.com'),
+            password=pop3_config.setdefault('password', 'rm'),
+            pop_host=pop3_config.setdefault('host', 'example.com'),
             pop_port=pop3_config.setdefault('port', 110),
             pop_ssl=pop3_config.setdefault('ssl', False),
             pop_tls=pop3_config.setdefault('tls', False),
-        ).pop_able(), 'Failed to login POP3 Server.'
+        ).pop_able():
+            raise ValueError('Failed to login POP3 Server.')
         self._pop3_config = pop3_config
-        logger.info('POP3 configration ({}) confirmed.'.format(pop3_config['username']))
+        logger.info('POP3 configration (%s) confirmed.',
+                    pop3_config['username'])
 
         # smtp，连接失败则抛出异常
-        assert zmail.server(
+        if not smtp_config:
+            smtp_config = {}
+        if not zmail.server(
             username=smtp_config.setdefault('username', 'rm@example.com'),
-            password=smtp_config.setdefault('password', 'rm'),  
-            smtp_host=smtp_config.setdefault('host', 'example.com'), 
+            password=smtp_config.setdefault('password', 'rm'),
+            smtp_host=smtp_config.setdefault('host', 'example.com'),
             smtp_port=smtp_config.setdefault('port', 110),
             smtp_ssl=smtp_config.setdefault('ssl', False),
             smtp_tls=smtp_config.setdefault('tls', False),
-        ).smtp_able(), 'Failed to login SMTP Server.'
+        ).smtp_able():
+            raise ValueError('Failed to login SMTP Server.')
         self._smtp_config = smtp_config
-        logger.info('SMTP configration ({}) confirmed.'.format(smtp_config['username']))
+        logger.info('SMTP configration (%s) confirmed.',
+                    smtp_config['username'])
 
         # 其他邮件设置
-        assert type(mail_config.setdefault('default_domain', 'example.com')) == str, 'invalid arg: mail_config.default_domain'
-        logger.info('default_domain: {}'.format(mail_config['default_domain']))
-        assert type(mail_config.setdefault('default_cc', 'example.com')) == str, 'invalid arg: mail_config.default_cc'
-        logger.info('default_cc: {}'.format(mail_config['default_cc']))
-        self._mail_config = mail_config
+        if not isinstance(default_domain, str):
+            raise TypeError('invalid arg: default_domain')
+        self._default_domain = default_domain
+        logger.info('default_domain: %s', self._default_domain)
+        if not isinstance(default_cc, str):
+            raise TypeError('invalid arg: default_cc')
+        self._default_cc = f"{default_cc}@{default_domain}"
+        logger.info('default_cc: %s', self._default_cc)
 
-    def receive(self, temp_path:str, keywords:dict={}) -> list:
-        ''' 按照{keywords}指定的关键词拉取邮件，并将原始邮件和附件存放在{temp_path}
+    def receive(self, work_path: str, keywords: dict[str, str]) -> list[Parsed_Mail]:
+        ''' 按照{keywords}指定的关键词拉取邮件，并将原始邮件和附件存放在{work_path}
 
         Args:
-            temp_path(str): 临时存放邮件的位置；
+            work_path(str): 临时存放邮件的位置；
             keywords: {'submit': (str), 'finish': (str)}；默认为[提交审核]和[完成审核]；
 
         Returns:
-            [{xxx}(check_results), ...]
+            list[Parsed_Mail]
 
         Raises:
-            AssertionError: 如果参数类型非法
+            RuntimeError: 如果POP3服务器连接失败
         '''
         logger = logging.getLogger(__name__)
-        logger.debug('args: {}'.format({'temp_path': temp_path, 'keywords': keywords}))
-        assert os.path.isdir(temp_path), 'invalid arg: temp_path'
-        if not keywords:
-            keywords = {'submit': '[提交审核]', 'finish': '[完成审核]'}
-        assert (type(keywords.setdefault('submit', '[提交审核]')) == str and 
-            type(keywords.setdefault('finish', '[完成审核]')) == str
-        ), 'invalid arg: keywords'
-
+        logger.debug('args: %s', {
+            'temp_path': work_path, 'keywords': keywords
+        })
         pop3_server = zmail.server(
-            username=self._pop3_config['username'], 
-            password=self._pop3_config['password'], 
-            pop_host=self._pop3_config['host'], 
+            username=self._pop3_config['username'],
+            password=self._pop3_config['password'],
+            pop_host=self._pop3_config['host'],
             pop_port=self._pop3_config['port'],
             pop_ssl=self._pop3_config['ssl'],
             pop_tls=self._pop3_config['tls'],
         )
-        logger.debug('pop_able: {}'.format(pop3_server.pop_able()))
+        if not pop3_server.pop_able():
+            logger.error('pop3_server unable')
+            raise RuntimeError('POP3 server connection failed.')
 
-        ret = []
+        ret: list[Parsed_Mail] = []
         for operator in ['submit', 'finish']:
-            mails = pop3_server.get_mails(subject=keywords[operator], sender=self._mail_config['default_domain'])
-            logger.debug('{} elements in "{}"'.format(len(mails), keywords[operator]))
+            mails = pop3_server.get_mails(
+                subject=keywords[operator],
+                sender=self._default_domain,
+            )
+            logger.debug('%s elements in "%s"', len(mails), keywords[operator])
             # 反向处理邮件，当发生重复时按最后一份处理
             for mail in reversed(mails):
-                check_results = {
-                    'operator': operator, 
+                parsed_mail: Parsed_Mail = {
+                    'operator': operator,
                     'keyword': keywords[operator],
-                    'mail': {
-                        'timestamp': int(mail['date'].timestamp()),
-                        'from': mail['from'], 
-                        'subject': mail['subject'], 
-                        'content': mail['content_text'], 
-                        'attachments': [a[0] for a in mail['attachments']]
-                    },
-                    'warnings': []
+                    'timestamp': int(mail['date'].timestamp()),
+                    'from_': parseaddr(mail['from'])[1],
+                    'subject': mail['subject'],
+                    'content': mail['content_text'],
+                    'temp_path': ''
                 }
-                logger.debug('mail: {}'.format(check_results['mail']))
-                check_results['work_path'] = os.path.join(
-                    temp_path, 
+                parsed_mail['temp_path'] = os.path.join(
+                    work_path,
                     '{}_{}_'.format(
-                        datetime.datetime.now().timestamp(), 
-                        parseaddr(check_results['mail']['from'])[1].split('@')[0]
+                        datetime.datetime.now().timestamp(),
+                        parsed_mail['from_'].split('@')[0]
                     )
                 )
-                os.mkdir(check_results['work_path'])
-                logger.info('saving eml to "{}"'.format(check_results['work_path']))
-                zmail.save(mail, '{}.eml'.format(operator), target_path=check_results['work_path'], overwrite=True)
-                os.mkdir(os.path.join(check_results['work_path'], 'attachments'))
-                zmail.save_attachment(mail, target_path=os.path.join(check_results['work_path'], 'attachments'), overwrite=True)
-                ret.append(check_results)
+                os.mkdir(parsed_mail['temp_path'])
+                logger.info('saving eml to "%s"', parsed_mail['temp_path'])
+                zmail.save(
+                    mail,
+                    f"{operator}.eml",
+                    target_path=parsed_mail['temp_path'],
+                    overwrite=True,
+                )
+                os.mkdir(os.path.join(
+                    parsed_mail['temp_path'], 'attachments'))
+                zmail.save_attachment(
+                    mail,
+                    target_path=os.path.join(
+                        parsed_mail['temp_path'], 'attachments'),
+                    overwrite=True,
+                )
+                ret.append(parsed_mail)
                 pop3_server.delete(mail['id'])
-                logger.debug('deleted {}'.format(mail['id']))
+                logger.debug('deleted %s', mail['id'])
 
-        logger.debug('return: {}'.format(ret))
+        logger.debug('return: %s', ret)
         return ret
 
-    def read(self, temp_path:str, key:str, eml_path:str) -> dict:
-        ''' 读取本地eml文件，并将原始邮件和附件存放在{temp_path}
+    def read(self, temp_path: str) -> Parsed_Mail | None:
+        ''' 在{temp_path}中读取eml文件
 
         Args:
-            temp_path(str): 临时存放邮件的位置；
-            key(str): 'submit' or 'finish'
-            eml_path(str): 本地eml文件的路径
+            temp_path(str): 临时存放邮件的位置
 
         Returns:
-            {xxx}(check_results)
-
-        Raises:
-            AssertionError: 如果参数类型非法
+            Parsed_Mail | None
         '''
         logger = logging.getLogger(__name__)
-        logger.debug('args: {}'.format({'temp_path': temp_path, 'key': key, 'eml_path': eml_path}))
-        assert os.path.isdir(temp_path), 'invalid arg: temp_path'
-        assert key in ['submit', 'finish'], 'invalid arg: key'
-        assert os.path.isfile(eml_path), 'invalid arg: eml_path'
-        mail = zmail.read(eml_path)
-        check_results = {
-            'operator': key, 
+        logger.debug('args: %s', {'temp_path': temp_path})
+        if os.path.exists(os.path.join(temp_path, 'submit.eml')):
+            operator = 'submit'
+            mail = zmail.read(os.path.join(temp_path, 'submit.eml'))
+        elif os.path.exists(os.path.join(temp_path, 'finish.eml')):
+            operator = 'finish'
+            mail = zmail.read(os.path.join(temp_path, 'finish.eml'))
+        else:
+            return None
+        parsed_mail: Parsed_Mail = {
+            'operator': operator,
             'keyword': '',
-            'mail': {
-                'timestamp': int(mail['date'].timestamp()),
-                'from': mail['from'], 
-                'subject': mail['subject'], 
-                'content': mail['content_text'], 
-                'attachments': [a[0] for a in mail['attachments']]
-            },
-            'warnings': []
+            'timestamp': int(mail['date'].timestamp()),
+            'from_': parseaddr(mail['from'])[1],
+            'subject': mail['subject'],
+            'content': mail['content_text'],
+            'temp_path': temp_path,
         }
-        logger.debug('mail: {}'.format(check_results['mail']))
-        check_results['work_path'] = os.path.join(
-            temp_path, 
-            '{}_{}_'.format(datetime.datetime.now().timestamp(), key)
+        if not os.path.exists(os.path.join(temp_path, 'attachments')):
+            os.mkdir(os.path.join(temp_path, 'attachments'))
+        zmail.save_attachment(
+            mail,
+            target_path=os.path.join(temp_path, 'attachments'),
+            overwrite=True,
         )
-        os.mkdir(check_results['work_path'])
-        logger.info('saving eml to "{}"'.format(check_results['work_path']))
-        zmail.save(mail, '{}.eml'.format(key), target_path=check_results['work_path'], overwrite=True)
-        os.mkdir(os.path.join(check_results['work_path'], 'attachments'))
-        zmail.save_attachment(mail, target_path=os.path.join(check_results['work_path'], 'attachments'), overwrite=True)
 
-        logger.debug('return: {}'.format(check_results))
-        return check_results
+        logger.debug('return: %s', parsed_mail)
+        return parsed_mail
 
-    def send(self, user_id:str, subject:str, content:str='', attachment:str='', needs_cc:bool=False, to_stdout=False):
-        ''' 向{user_id}发送邮件。
+    def send(self, recipient: str, subject: str, content: str, attachment: str = '', needs_cc: bool = False, to_stdout: bool = False):
+        ''' 发送邮件
 
         Args:
-            user_id(str): 用户ID
+            recipient(str): 对象邮箱
             subject(str): 邮件主题
             content(str): 邮件内容
-            attachment(str): 附件文件路径（绝对路径）（可选/默认值[]）
+            attachment(str): 附件文件路径（绝对路径）（可选）
             needs_cc(bool): 是否抄送管理员（可选/默认值False）
             to_stdout(bool): 是否将邮件重定向到stdout（可选/默认值False）
-
-        Raises:
-            AssertionError: 如果参数类型非法
         '''
         logger = logging.getLogger(__name__)
-        logger.debug('args: {}'.format({
-            'user_id': user_id, 
-            'subject': subject, 
-            'content': content, 
-            'attachment': attachment, 
+        logger.debug('args: %s', {
+            'recipient': recipient,
+            'subject': subject,
+            'content': content,
+            'attachment': attachment,
             'needs_cc': needs_cc,
             'to_stdout': to_stdout,
-        }))
-        assert type(user_id) == str, 'invalid arg: user_id'
-        recipient = mysql.t_user.fetch(user_id)[3]
-        assert type(subject) == str, 'invalid arg: subject'
-        assert type(content) == str, 'invalid arg: content'
-        if attachment:
-            assert os.path.exists(attachment), 'invalid arg: attachment'
+        })
 
         mail = {
-            'subject': subject, 
-            'from': formataddr((Header('审核管理机器人', 'utf-8').encode(), self._smtp_config['username'])), 
-            'content_text': content, 
+            'subject': subject,
+            'from': formataddr((Header('审核管理机器人', 'utf-8').encode(), self._smtp_config['username'])),
+            'content_text': content,
             'attachments': [attachment]
         }
-        logger.debug('mail: {}'.format(mail))
+        logger.debug('mail: %s', mail)
+        logger.debug('size of "{}": {:.2}MB'.format(
+            os.path.basename(attachment), os.path.getsize(attachment) / 1048576))
 
         if to_stdout:
             logger.warning('redirect to stdout and return')
             return
 
-        smtp_server = zmail.server(
-            username=self._smtp_config['username'], 
-            password=self._smtp_config['password'], 
-            smtp_host=self._smtp_config['host'], 
-            smtp_port=self._smtp_config['port'],
-            smtp_ssl=self._smtp_config['ssl'],
-            smtp_tls=self._smtp_config['tls'],
-        )
-        logger.debug('smtp_able: {}'.format(smtp_server.smtp_able()))
-
-        size = os.path.getsize(attachment)
-        logger.debug('size of "{}": {:.2}MB'.format(os.path.basename(attachment), size / 1048576))
-
-        if self._mail_config['default_cc'] and needs_cc:
-            smtp_server.send_mail(recipient, mail, cc='{}@{}'.format(self._mail_config['default_cc'], self._mail_config['default_domain']))
-        else:
-            smtp_server.send_mail(recipient, mail)
+        try:
+            smtp_server = zmail.server(
+                username=self._smtp_config['username'],
+                password=self._smtp_config['password'],
+                smtp_host=self._smtp_config['host'],
+                smtp_port=self._smtp_config['port'],
+                smtp_ssl=self._smtp_config['ssl'],
+                smtp_tls=self._smtp_config['tls'],
+            )
+            if self._default_cc and needs_cc:
+                smtp_server.send_mail([recipient], mail, cc=self._default_cc)
+            else:
+                smtp_server.send_mail([recipient], mail)
+        except:
+            logger.error('send_mail error', exc_info=True)
+        finally:
+            exc_type, exc_value, exc_traceback = sys.exc_info()
+            mysql.t_log.add_message(
+                'mail',
+                recipient,
+                subject,
+                content,
+                str(exc_value) if exc_type else '',
+            )

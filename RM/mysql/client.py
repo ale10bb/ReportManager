@@ -1,14 +1,16 @@
 # -*- coding: UTF-8 -*-
+from mysql.connector.cursor import MySQLCursor
+from . import var
+
 
 class Transaction:
-    def __init__(self, pool):
-        self._pool = pool
+    def __init__(self):
+        self._cnx = var.pool.get_connection()
 
     def __enter__(self):
-        self._cnx = self._pool.get_connection()
-        self._cursor = self._cnx.cursor(buffered=True)
+        self._cursor: MySQLCursor = self._cnx.cursor()
         return self._cursor
- 
+
     def __exit__(self, exc_type, exc_val, exc_tb):
         if not exc_type:
             self._cnx.commit()
@@ -25,3 +27,18 @@ class Transaction:
             self._cursor.close()
             self._cnx.close()
             return False
+
+
+class Selection:
+    def __init__(self):
+        self._cnx = var.pool.get_connection()
+
+    def __enter__(self):
+        self._cursor: MySQLCursor = self._cnx.cursor()
+        return self._cursor
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self._cnx.rollback()
+        self._cursor.close()
+        self._cnx.close()
+        return not bool(exc_type)
