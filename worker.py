@@ -492,7 +492,7 @@ def do_resend(id: str | int, redirect: str = ''):
     else:
         attachments = [archive_path]
     mail.send(
-        to,
+        mysql.t_user.fetch(to)['email'],
         resend_notification['subject'],
         resend_notification['content'],
         attachments,
