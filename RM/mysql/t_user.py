@@ -10,14 +10,11 @@ from ..types import *
 
 
 def search(**kwargs) -> list[UserItem]:
-    ''' 根据{id}、{name}、{phone}、{email}以及是否为审核人模糊搜索user表内容。
+    ''' 根据传入的kwargs，搜索user表内容，支持参数包括：
 
-    Args:
-        kwargs -> id(str): 用户ID（精确查询）
-        kwargs -> name(str): 用户姓名
-        kwargs -> phone(str): 用户手机
-        kwargs -> email(str): 用户邮箱
-        kwargs -> only_reviewer(bool): 仅审核人(role=1)
+    1. id(str): 按用户id精准查询
+    2. name(str)/phone(str)/email(str): 按姓名、手机、邮箱模糊查询
+    3. only_reviewer(bool): 仅查询审核人(role=1)
 
     Returns:
         list[UserItem]
@@ -53,7 +50,7 @@ def fetch(user_id: str) -> UserItem | None:
     ''' 按照user_id获取user表内容
 
     Args:
-        user_id(str): 用户ID
+        user_id: 用户ID
 
     Returns:
         UserItem | None
@@ -81,7 +78,7 @@ def __contains__(user_id: str) -> bool:
     ''' 检查user表中是否存在{user_id}
 
     Args:
-        user_id(str): 用户ID
+        user_id: 用户ID
 
     Returns:
         bool: {user_id}存在返回True，否则返回False
@@ -90,15 +87,13 @@ def __contains__(user_id: str) -> bool:
 
 
 def pop(count: int = 1, excludes: list[str] | None = None, urgent: bool = False, hide_busy: bool = True) -> list[QueueItem]:
-    ''' 获取下{count}个审核人。
-
-    根据条件获取下{count}个审核人。获取时排除{excludes}中的审核人ID，如果设置了urgent，则额外排除status=1的审核人。
+    ''' 根据条件获取下{count}个审核人
 
     Args:
-        count(int): 需要获取的审核人数量（可选/默认值1）
-        excludes(list): 排除的审核人ID（可选/默认值[]）
-        urgent(bool): 是否降权status=1（可选/默认值False）
-        hide_busy(bool): 是否隐藏status=2（可选/默认值True）
+        count: 需要获取的审核人数量
+        excludes: 排除的审核人ID
+        urgent: 是否降权status=1的审核人
+        hide_busy: 是否隐藏status=2的审核人
 
     Returns:
         list[QueueItem]：长度为{count}的列表，增加pages_diff、current、skipped值
@@ -153,11 +148,11 @@ def pop(count: int = 1, excludes: list[str] | None = None, urgent: bool = False,
 
 
 def set_status(user_id: str, status: Literal[0, 1, 2]):
-    ''' 设置忙碌状态status。
+    ''' 设置忙碌状态status
 
     Args:
-        user_id(str): 用户ID
-        status(int): 状态
+        user_id: 用户ID
+        status: 状态
     '''
     logger = logging.getLogger(__name__)
     logger.debug('args: %s', {'user_id': user_id, 'status': status})
@@ -172,10 +167,10 @@ def set_status(user_id: str, status: Literal[0, 1, 2]):
 
 
 def reset_status(days: int = 7):
-    ''' 重置超时(超过{days})的忙碌状态status。
+    ''' 重置超时(超过{days})的忙碌状态status
 
     Args:
-        days(int): 超时时间
+        days: 超时时间
     '''
     logger = logging.getLogger(__name__)
     logger.debug('args: %s', {'days': days})

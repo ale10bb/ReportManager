@@ -17,10 +17,10 @@ class Dingtalk:
         ''' 初始化dingtalk的配置
 
         Args:
-            chatbot(dict): 需包含'webhook'、'secret'
-            chatbot_debug(dict): 需包含'webhook'、'secret'
-            attend_url(str): 打卡跳转地址
-            interaction_url(str): 管理系统跳转地址
+            chatbot: 需包含'webhook'、'secret'
+            chatbot_debug: 需包含'webhook'、'secret'
+            attend_url: 打卡跳转地址
+            interaction_url: 管理系统跳转地址
 
         Raises:
             TypeError: 如果参数无效
@@ -61,11 +61,11 @@ class Dingtalk:
         ''' 发送markdown，指定phone时尝试@该号码。
 
         Args:
-            title(str): 通知标题
-            content(str): 通知内容
-            phone(str): 需要@的号码（可选/默认值空）
-            to_debug(bool): 发送至主通知群还是调试通知群（可选/默认值False->发送至主通知群）
-            to_stdout(bool): 是否将通知重定向到stdout（可选/默认值False）
+            title: 通知标题
+            content: 通知内容
+            phone: 需要@的号码
+            to_debug: 发送至主通知群还是调试通知群
+            to_stdout: 是否将通知重定向到stdout
         '''
         logger = logging.getLogger(__name__)
         logger.debug('args: %s', {
@@ -117,9 +117,9 @@ class Dingtalk:
         ''' 发送（打卡用）action_card。
 
         Args:
-            content(str): 通知内容
-            to_debug(bool): 发送至主通知群还是调试通知群（可选/默认值False->发送至主通知群）
-            to_stdout(bool): 是否将通知重定向到stdout（可选/默认值False）
+            content: 通知内容
+            to_debug: 发送至主通知群还是调试通知群
+            to_stdout: 是否将通知重定向到stdout
         '''
         logger = logging.getLogger(__name__)
         logger.debug('args: %s', {

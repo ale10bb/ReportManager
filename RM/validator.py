@@ -11,13 +11,13 @@ from .types import *
 
 
 def check_mail_content(from_: str, subject: str, content: str, timestamp: int) -> Checked_Mail_Content:
-    ''' 读取{mail_content}中的内容，获取发件人和指令，处理完毕时返回警告信息及处理结果{Checked_Mail_Content}。
+    ''' 读取{mail_content}中的内容，获取发件人和指令，处理完毕时返回警告信息及处理结果{Checked_Mail_Content}
 
     Args:
-        from_(str): 邮件发件人
-        subject(str): 邮件标题
-        content(str): 邮件内容
-        timestamp(int): 邮件时间戳
+        from_: 邮件发件人
+        subject: 邮件标题
+        content: 邮件内容
+        timestamp: 邮件时间戳
 
     Returns:
         Checked_Mail_Content
@@ -137,11 +137,11 @@ def check_mail_content(from_: str, subject: str, content: str, timestamp: int) -
 
 
 def check_mail_attachment(work_path: str, operator: Literal['submit', 'finish']) -> Checked_Mail_Attachment:
-    ''' 读取存放在{work_path}中的附件，根据操作符获取文档信息。处理完毕后，返回attachment信息。
+    ''' 读取存放在{work_path}中的附件，根据操作符获取文档信息。处理完毕后，返回attachment信息
 
     Args:
-        work_path(str)：工作目录（存放附件的目录）
-        operator(str): 操作符（submit/finish）
+        work_path：工作目录（存放附件的目录）
+        operator: 操作符（submit/finish）
 
     Returns:
         Checked_Mail_Attachment

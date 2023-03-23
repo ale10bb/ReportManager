@@ -8,20 +8,15 @@ from ..types import *
 
 
 def search(page_index: int = 1, page_size: int = 10, **kwargs) -> Histories:
-    ''' 搜索history表中的项目。
+    ''' 根据传入的kwargs，搜索history表中的项目，支持参数包括：
 
-    1. 传入code时，按条件模糊查询；支持按“+”分割传入多个code，如"123+345"
-    2. 传入authorid/reviewerid时，按条件精准查询
-    3. 传入name/company时，按条件模糊查询
+    1. code(str): 按项目编号模糊查询；支持按“+”分割传入多个code，如"123+345"
+    2. authorid(str)/reviewerid(str): 按撰写人id或审核人id精准查询
+    3. name(str)/company(str): 按项目名称或委托单位模糊查询
 
     Args:
-        page_index(int): 分页/当前页（可选/默认值1）
-        page_size(int): 分页/页大小（可选/默认值10）
-        kwargs -> code(str): 项目编号
-        kwargs -> authorid(str): 撰写人id（精确查询）
-        kwargs -> reviewerid(str): 审核人id（精确查询）
-        kwargs -> name(str): 项目名称
-        kwargs -> company(str): 委托单位
+        page_index: 分页/当前页
+        page_size: 分页/页大小
 
     Returns:
         {'history': list[HistoryRecord], 'total': int}
@@ -81,7 +76,7 @@ def fetch(history_id: int) -> HistoryRecord | None:
     ''' 按照history_id查询对应项目的信息
 
     Args:
-        history_id(int): 项目ID
+        history_id: 项目ID
 
     Returns:
         HistoryRecord | None

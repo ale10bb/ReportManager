@@ -158,10 +158,14 @@ def init(config):
 
 
 def do_mail(parsed_mail: Parsed_Mail):
-    ''' 邮件管理函数的主逻辑，对于传入的单个邮件，依次进行邮件检查、数据库操作、发送通知步骤
+    ''' 邮件处理入口，功能包括：
+    
+    1. 邮件检查
+    2. 数据库操作
+    3. 发送通知
 
     Args:
-        parsed_mail(Parsed_Mail): 预处理的邮件
+        parsed_mail: 预处理的邮件
     '''
     logger = logging.getLogger(__name__)
     logger.debug('args: %s', {'parsed_mail': parsed_mail})
@@ -243,10 +247,10 @@ def handle_submit(work_path: str, content: Content, attachment: Attachment, warn
     ''' 对提交审核邮件进行数据库操作、发送通知步骤
 
     Args:
-        work_path(str): 临时目录
-        content(Content): 处理后的邮件内容信息
-        attachment(Attachment): 处理后的邮件附件信息
-        warnings(list[str]): 前步骤产生的告警信息
+        work_path: 临时目录
+        content: 处理后的邮件内容信息
+        attachment: 处理后的邮件附件信息
+        warnings: 前步骤产生的告警信息
 
     Raises:
         RuntimeError: 如果插入记录失败
@@ -349,10 +353,10 @@ def handle_finish(work_path: str, content: Content, attachment: Attachment, warn
     ''' 对完成审核邮件进行数据库操作、发送通知步骤
 
     Args:
-        work_path(str): 临时目录
-        content(Content): 处理后的邮件内容信息
-        attachment(Attachment): 处理后的邮件附件信息
-        warnings(list[str]): 前步骤产生的告警信息
+        work_path: 临时目录
+        content: 处理后的邮件内容信息
+        attachment: 处理后的邮件附件信息
+        warnings: 前步骤产生的告警信息
 
     Raises:
         RuntimeError: 如果删除记录失败
@@ -435,11 +439,11 @@ def handle_finish(work_path: str, content: Content, attachment: Attachment, warn
 
 
 def do_resend(id: str | int, redirect: str = ''):
-    ''' 根据{id}的信息及类型（提交审核/完成审核），重新向任务相关人员发送邮件。
+    ''' 邮件重发入口，重新向任务相关人员发送提交审核/完成审核邮件。
 
     Args:
-        id(str | int): 项目记录ID
-        redirect(str): 忽略原发件对象，将邮件发送至指定user_id
+        id: 项目记录ID
+        redirect: 忽略原发件对象，将邮件发送至指定user_id
     '''
     logger = logging.getLogger(__name__)
     logger.debug('args: %s', {'id': id, 'redirect': redirect})

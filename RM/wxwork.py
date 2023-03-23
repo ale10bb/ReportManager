@@ -8,7 +8,7 @@ from .types import *
 
 
 class WXWork:
-    ''' WXWork的封装客户端，实现发送text消息的功能。
+    ''' WXWork的封装客户端，实现发送text消息的功能
     '''
     _enabled: bool = False
     _corpid: str = ''
@@ -22,10 +22,10 @@ class WXWork:
         ''' 初始化wxwork的配置
 
         Args:
-            corpid(str): 企业ID
-            agentid(int): 应用ID
-            secret(str): 应用secret
-            admin_userid(str): 单独通知的管理员
+            corpid: 企业ID
+            agentid: 应用ID
+            secret: 应用secret
+            admin_userid: 单独通知的管理员
 
         Raises:
             ValueError: 如果参数无效
@@ -56,7 +56,7 @@ class WXWork:
             logger.info('admin_userid: %s', admin_userid)
 
     def refresh_access_token(self):
-        ''' 检测access_token是否过期，并自动刷新。
+        ''' 检测access_token是否过期，并自动刷新
         '''
         logger = logging.getLogger(__name__)
 
@@ -81,13 +81,15 @@ class WXWork:
             pass
 
     def send_text(self, content: str, to: list[str], to_debug: bool = False, to_stdout: bool = False):
-        ''' 向列表中的用户发送text。参见https://developer.work.weixin.qq.com/document/path/90236#%E6%96%87%E6%9C%AC%E6%B6%88%E6%81%AF
+        ''' 向列表中的用户发送text
+        
+        https://developer.work.weixin.qq.com/document/path/90236#%E6%96%87%E6%9C%AC%E6%B6%88%E6%81%AF
 
         Args:
-            content(str): 通知内容
-            to(list): 发送对象的userid列表
-            to_debug(bool): 是否将通知强制发送至管理员（可选/默认值False->发送至to指定的对象）
-            to_stdout(bool): 是否将通知重定向到stdout（可选/默认值False）
+            content: 通知内容
+            to: 发送对象的userid列表
+            to_debug: 是否将通知强制发送至管理员
+            to_stdout: 是否将通知重定向到stdout
         '''
         logger = logging.getLogger(__name__)
         logger.debug('args: %s', {
@@ -125,10 +127,12 @@ class WXWork:
             )
 
     def get_redirect(self, host: str) -> str:
-        ''' 获取OAuth跳转链接。参见https://developer.work.weixin.qq.com/document/path/91022
+        ''' 获取OAuth跳转链接
+        
+        https://developer.work.weixin.qq.com/document/path/91022
 
         Args:
-            host(str): 跳转的host（默认HTTPS）
+            host: 跳转的host（默认HTTPS）
         '''
         logger = logging.getLogger(__name__)
         logger.debug('args: %s', {'host': host})
@@ -141,10 +145,12 @@ class WXWork:
         return url
 
     def get_userid(self, code: str) -> str:
-        ''' 根据code获取成员信息。参见https://developer.work.weixin.qq.com/document/path/91023
+        ''' 根据code获取成员信息
+        
+        https://developer.work.weixin.qq.com/document/path/91023
 
         Args:
-            code(str): 跳转携带的code
+            code: 跳转携带的code
 
         Raises:
             RuntimeError: 如果请求OAuth失败

@@ -7,11 +7,11 @@ from .types import *
 
 
 def build_submit_mail(record: CurrentRecord, warnings: list[str]) -> Built_Message:
-    ''' 根据传入的参数，生成邮件内容。
+    ''' 根据传入的参数，生成邮件内容
 
     Args:
-        record(CurrentRecord): 对象结果记录
-        warnings(list[str]): 处理过程中产生的告警信息
+        record: 对象结果记录
+        warnings: 处理过程中产生的告警信息
 
     Returns:
         Built_Message
@@ -45,11 +45,11 @@ def build_submit_mail(record: CurrentRecord, warnings: list[str]) -> Built_Messa
 
 
 def build_submit_dingtalk(record: CurrentRecord, warnings: list[str]) -> Built_Message:
-    ''' 根据传入的参数，生成钉钉通知内容。
+    ''' 根据传入的参数，生成钉钉通知内容
 
     Args:
-        record(CurrentRecord): 对象结果记录
-        warnings(list[str]): 处理过程中产生的告警信息
+        record: 对象结果记录
+        warnings: 处理过程中产生的告警信息
 
     Returns:
         Built_Message
@@ -88,11 +88,11 @@ def build_submit_dingtalk(record: CurrentRecord, warnings: list[str]) -> Built_M
 
 
 def build_submit_wxwork(record: CurrentRecord, warnings: list[str]) -> Built_Message:
-    ''' 根据传入的参数，生成企业微信通知内容。
+    ''' 根据传入的参数，生成企业微信通知内容
 
     Args:
-        record(CurrentRecord): 对象结果记录
-        warnings(list[str]): 处理过程中产生的告警信息
+        record: 对象结果记录
+        warnings: 处理过程中产生的告警信息
 
     Returns:
         Built_Message
@@ -131,11 +131,11 @@ def build_submit_wxwork(record: CurrentRecord, warnings: list[str]) -> Built_Mes
 
 
 def build_finish_mail(record: HistoryRecord, warnings: list[str]) -> Built_Message:
-    ''' 根据传入的参数，生成邮件通知内容。
+    ''' 根据传入的参数，生成邮件通知内容
 
     Args:
-        record(HistoryRecord): 对象结果记录
-        warnings(list[str]): 处理过程中产生的告警信息
+        record: 对象结果记录
+        warnings: 处理过程中产生的告警信息
 
     Returns:
         {'subject': (str), 'content': (str)}
@@ -177,11 +177,11 @@ def build_finish_mail(record: HistoryRecord, warnings: list[str]) -> Built_Messa
 
 
 def build_finish_dingtalk(record: HistoryRecord, warnings: list[str]) -> Built_Message:
-    ''' 根据传入的参数，生成钉钉通知内容。
+    ''' 根据传入的参数，生成钉钉通知内容
 
     Args:
-        record(HistoryRecord): 对象结果记录
-        warnings(list[str]): 处理过程中产生的告警信息
+        record: 对象结果记录
+        warnings: 处理过程中产生的告警信息
 
     Returns:
         {'subject': (str), 'content': (str)}
@@ -213,11 +213,11 @@ def build_finish_dingtalk(record: HistoryRecord, warnings: list[str]) -> Built_M
 
 
 def build_finish_wxwork(record: HistoryRecord, warnings: list[str]) -> Built_Message:
-    ''' 根据传入的参数，生成企业微信通知内容。
+    ''' 根据传入的参数，生成企业微信通知内容
 
     Args:
-        record(HistoryRecord): 对象结果记录
-        warnings(list[str]): 处理过程中产生的告警信息
+        record: 对象结果记录
+        warnings: 处理过程中产生的告警信息
 
     Returns:
         Built_Message

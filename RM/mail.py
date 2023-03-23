@@ -22,10 +22,10 @@ class Mail:
         ''' 初始化mail的配置
 
         Args:
-            pop3_config(dict): 需包含'username'、'password'、'host'、'port'、'ssl'、'tls'
-            smtp_config(dict): 需包含'username'、'password'、'host'、'port'、'ssl'、'tls'
-            default_domain(str): 白名单邮箱域名
-            default_cc(str): 默认抄送者
+            pop3_config: 需包含'username'、'password'、'host'、'port'、'ssl'、'tls'
+            smtp_config: 需包含'username'、'password'、'host'、'port'、'ssl'、'tls'
+            default_domain: 白名单邮箱域名
+            default_cc: 默认抄送者
 
         Raises:
             ValueError/TypeError: 如果参数无效
@@ -78,8 +78,8 @@ class Mail:
         ''' 按照{keywords}指定的关键词拉取邮件，并将原始邮件和附件存放在{work_path}
 
         Args:
-            work_path(str): 临时存放邮件的位置；
-            keywords: {'submit': (str), 'finish': (str)}；默认为[提交审核]和[完成审核]；
+            work_path: 临时存放邮件的位置
+            keywords: {'submit': (str), 'finish': (str)}；默认为[提交审核]和[完成审核]
 
         Returns:
             list[Parsed_Mail]
@@ -155,7 +155,7 @@ class Mail:
         ''' 在{temp_path}中读取eml文件
 
         Args:
-            temp_path(str): 临时存放邮件的位置
+            temp_path: 临时存放邮件的位置
 
         Returns:
             Parsed_Mail | None
@@ -197,9 +197,9 @@ class Mail:
             recipient: 对象邮箱
             subject: 邮件主题
             content: 邮件内容
-            attachments: 附件文件路径（绝对路径）（可选）
-            needs_cc: 是否抄送管理员（可选/默认值False）
-            to_stdout: 是否将邮件重定向到stdout（可选/默认值False）
+            attachments: 附件文件路径
+            needs_cc: 是否抄送管理员
+            to_stdout: 是否将邮件重定向到stdout
         '''
         logger = logging.getLogger(__name__)
         logger.debug('args: %s', {

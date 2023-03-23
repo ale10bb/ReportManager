@@ -113,7 +113,10 @@ def before_first_request():
 
 
 def do_attend():
-    ''' 打卡提醒函数的主入口。调用后向主通知群发送打卡提示，包含当前任务、分配队列和交互入口。向企业微信发送任务提醒。
+    ''' 任务提醒入口，功能包括：
+    
+    1. 向主通知群发送打卡提示，包含当前任务、分配队列和交互入口
+    2. 向企业微信发送任务提醒
     '''
     # 准备通知所需数据
     currents = mysql.t_current.search(page_size=9999)['current']
@@ -172,8 +175,8 @@ def do_attend():
 @app.before_request
 def before_request():
     app.logger.debug('path: %s', request.path)
-    g.client_ip = request.headers['X-Forwarded-For'].split(
-        ',')[0] if 'X-Forwarded-For' in request.headers else request.remote_addr
+    g.client_ip = request.headers['X-Forwarded-For'].split(',')[0] \
+        if 'X-Forwarded-For' in request.headers else request.remote_addr
     try:
         ipaddress.ip_address(g.client_ip)
     except ValueError as err:

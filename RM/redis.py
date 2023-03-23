@@ -32,8 +32,8 @@ class RedisStream:
         ''' 在Stream中插入一条指令
 
         Args:
-            command(str): 操作类型
-            kwargs(dict): 操作参数
+            command: 操作类型
+            kwargs: 操作参数
         '''
         logger = logging.getLogger(__name__)
         logger.debug('args: %s', {'command': command, 'kwargs': kwargs})

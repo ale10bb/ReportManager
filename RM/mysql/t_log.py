@@ -9,14 +9,14 @@ from ..types import *
 
 
 def add_mail(warnings: list[str], err: str | None, parsed_mail: Parsed_Mail, content: Content, attachment: Attachment):
-    ''' 向log_mail中插入操作日志。
+    ''' 向log_mail中插入操作日志
 
     Args:
-        warnings(list[str]): 告警信息
-        err(str): 错误信息
-        parsed_mail(Parsed_Mail): 校验结果
-        content(Content): 校验结果
-        attachment(Attachment): 校验结果
+        warnings: 告警信息
+        err: 错误信息
+        parsed_mail: 校验结果
+        content: 校验结果
+        attachment: 校验结果
     '''
     logger = logging.getLogger(__name__)
     logger.debug('args: %s', {
@@ -44,14 +44,14 @@ def add_mail(warnings: list[str], err: str | None, parsed_mail: Parsed_Mail, con
 
 
 def add_manage(ip: str, user: str | None, user_agent: str, url: str, param: dict):
-    ''' 向log_manage中插入操作日志。
+    ''' 向log_manage中插入操作日志
 
     Args:
-        ip(str): 操作人IP
-        user(str|None): 操作人
-        user_agent(str): UA
-        url(str): 模块路径
-        param(dict): 模块参数
+        ip: 操作人IP
+        user: 操作人
+        user_agent: UA
+        url: 模块路径
+        param: 模块参数
     '''
     logger = logging.getLogger(__name__)
     logger.debug('args: %s', {
@@ -71,14 +71,14 @@ def add_manage(ip: str, user: str | None, user_agent: str, url: str, param: dict
 
 
 def add_message(sender: Literal['mail', 'wxwork', 'dingtalk'], receiver: str, subject: str, content: str, result: str):
-    ''' 向log_message中插入操作日志。
+    ''' 向log_message中插入操作日志
 
     Args:
-        sender(str): 消息源（类型）
-        receiver(str): 发送对象
-        subject(str): 消息标题
-        content(str): 消息内容
-        result(str): 发送结果
+        sender: 消息源（类型）
+        receiver: 发送对象
+        subject: 消息标题
+        content: 消息内容
+        result: 发送结果
     '''
     logger = logging.getLogger(__name__)
     logger.debug('args: %s', {
