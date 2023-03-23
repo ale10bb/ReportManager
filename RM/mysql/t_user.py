@@ -41,6 +41,7 @@ def search(**kwargs) -> list[UserItem]:
         cursor.execute(sql, params)
         keys = ['id', 'name', 'phone', 'email', 'role', 'status']
         for row in cursor.fetchall():
+            logger.debug('row: %s', row)
             ret.append(UserItem(zip(keys, row)))
     logger.debug('return: %s', ret)
     return ret
@@ -68,6 +69,7 @@ def fetch(user_id: str) -> UserItem | None:
         cursor.execute(sql, (user_id,))
         row = cursor.fetchone()
         if row:
+            logger.debug('row: %s', row)
             keys = ['id', 'name', 'phone', 'email', 'role', 'status']
             ret = UserItem(zip(keys, row))
     logger.debug('return: %s', ret)
@@ -130,9 +132,9 @@ def pop(count: int = 1, excludes: list[str] | None = None, urgent: bool = False,
         keys = ['id', 'name', 'phone', 'email', 'role',
                 'status', 'pages_diff', 'current', 'skipped']
         for row in cursor.fetchall():
+            logger.debug('row: %s', row)
             ret.append(QueueItem(zip(keys, row)))
 
-    logger.debug('raw_results: %s', ret)
     ret = [item for item in ret if item['id'] not in excludes]
     if urgent:
         # 提升status=0(空闲)的审核人优先级

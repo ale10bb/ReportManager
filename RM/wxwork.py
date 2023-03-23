@@ -99,7 +99,7 @@ class WXWork:
         # 启用调试模式(to_stdout)后，消息将被重定向到stdout
         # WxWork未启用时，强制打开重定向功能
         if not self._enabled or to_stdout:
-            logger.warning('redirect to stdout and return')
+            logger.warning('redirect to stdout')
             return
 
         self.refresh_access_token()

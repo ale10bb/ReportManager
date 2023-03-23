@@ -59,6 +59,7 @@ def search(page_index: int = 1, page_size: int = 10, **kwargs) -> Currents:
         keys = ['id', 'authorid', 'authorname', 'reviewerid', 'reviewername',
                 'start', 'end', 'pages', 'urgent', 'company', 'names']
         for row in cursor.fetchall():
+            logger.debug('row: %s', row)
             d = CurrentRecord(zip(keys, row))
             d['names'] = json.loads(d['names'])
             d['urgent'] = bool(d['urgent'])
@@ -91,6 +92,7 @@ def fetch(current_id: str) -> CurrentRecord | None:
         )
         row = cursor.fetchone()
         if row:
+            logger.debug('row: %s', row)
             keys = ['id', 'authorid', 'authorname', 'reviewerid', 'reviewername',
                     'start', 'end', 'pages', 'urgent', 'company', 'names']
             ret = CurrentRecord(zip(keys, row))
@@ -177,8 +179,8 @@ def edit(current_id: str, **kwargs):
         for key, value in kwargs.items():
             if key == 'reviewerid':
                 # 修改审核人
-                logger.debug('reviewerid: %s -> %s',
-                             record['reviewerid'], value)
+                logger.info('reviewerid: %s -> %s',
+                            record['reviewerid'], value)
                 if value and \
                         (not t_user.__contains__(value) or value == record['authorid']):
                     raise ValueError('invalid arg: reviewerid')
@@ -194,7 +196,7 @@ def edit(current_id: str, **kwargs):
                 )
             if key == 'pages':
                 # 修改页数
-                logger.debug('pages: %s -> %s', record['pages'], value)
+                logger.info('pages: %s -> %s', record['pages'], value)
                 cursor.execute(
                     "UPDATE current SET pages = %s WHERE id = %s",
                     (value, record['id']),
@@ -209,7 +211,7 @@ def edit(current_id: str, **kwargs):
                 )
             if key == 'urgent':
                 # 修改加急状态
-                logger.debug('urgent: %s -> %s', record['urgent'], value)
+                logger.info('urgent: %s -> %s', record['urgent'], value)
                 cursor.execute(
                     "UPDATE current SET urgent = %s WHERE id = %s",
                     (value, record['id']),

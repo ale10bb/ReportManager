@@ -65,6 +65,7 @@ def search(page_index: int = 1, page_size: int = 10, **kwargs) -> Histories:
         keys = ['id', 'authorid', 'authorname', 'reviewerid', 'reviewername',
                 'start', 'end', 'pages', 'urgent', 'company', 'names']
         for row in cursor.fetchall():
+            logger.debug('row: %s', row)
             d = HistoryRecord(zip(keys, row))
             d['names'] = json.loads(d['names'])
             d['urgent'] = bool(d['urgent'])
@@ -97,6 +98,7 @@ def fetch(history_id: int) -> HistoryRecord | None:
         )
         row = cursor.fetchone()
         if row:
+            logger.debug('row: %s', row)
             keys = ['id', 'authorid', 'authorname', 'reviewerid', 'reviewername',
                     'start', 'end', 'pages', 'urgent', 'company', 'names']
             ret = HistoryRecord(zip(keys, row))
@@ -126,6 +128,7 @@ def pop() -> HistoryRecord | None:
             ''')
         row = cursor.fetchone()
         if row:
+            logger.debug('row: %s', row)
             keys = ['id', 'authorid', 'authorname', 'reviewerid', 'reviewername',
                     'start', 'end', 'pages', 'urgent', 'company', 'names']
             ret = HistoryRecord(zip(keys, row))

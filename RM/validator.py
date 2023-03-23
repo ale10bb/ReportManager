@@ -27,7 +27,7 @@ def check_mail_content(from_: str, subject: str, content: str, timestamp: int) -
     '''
     logger = logging.getLogger(__name__)
     logger.debug('args: %s', {
-        'from_': from_, 'subject': subject, 'content': content
+        'from_': from_, 'subject': subject, 'content': content, 'timestamp': timestamp
     })
     ret: Checked_Mail_Content = {'warnings': [], 'content': {
         'timestamp': timestamp, 'user_id': '', 'name': '', 'urgent': False, 'excludes': [], 'force': ''
@@ -126,7 +126,7 @@ def check_mail_content(from_: str, subject: str, content: str, timestamp: int) -
     #   指定了自己或组员
     if force == ret['content']['user_id'] or force in excludes:
         ret['warnings'].append(f"指定\"{force}\"失败: 项目相关人员")
-        logger.warning('rallbacked force due to "in excludes"')
+        logger.warning('invalid "force" and rollback')
         force = ''
     ret['content']['urgent'] = urgent
     ret['content']['excludes'] = excludes

@@ -146,7 +146,7 @@ class Mail:
                 )
                 ret.append(parsed_mail)
                 pop3_server.delete(mail['id'])
-                logger.debug('deleted %s', mail['id'])
+                logger.info('deleted %s', mail['id'])
 
         logger.debug('return: %s', ret)
         return ret
@@ -214,7 +214,7 @@ class Mail:
         if not attachments:
             attachments = []
         for attachment in attachments:
-            logger.debug('size of "{}": {:.2}MB'.format(
+            logger.info('size of "{}": {:.2}MB'.format(
                 os.path.basename(attachment), os.path.getsize(attachment) / 1048576))
 
         mail = {
@@ -224,7 +224,7 @@ class Mail:
             'attachments': attachments
         }
         if to_stdout:
-            logger.warning('redirect to stdout and return')
+            logger.warning('redirect to stdout')
             return
 
         try:

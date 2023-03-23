@@ -54,9 +54,9 @@ class RedisStream:
             block=0,
             noack=True,
         )
-        logger.debug('len: %s', l)
         value = l[0][1][0][1]
         value['kwargs'] = json.loads(value['kwargs'])
+        logger.debug('return: %s', value)
         return value
 
     def trim(self):

@@ -235,6 +235,7 @@ def encrypt(document_path: str):
     word = win32com.client.gencache.EnsureDispatch('Word.Application')
     document = None
     try:
+        logger.info('encrypting "%s"', os.path.basename(document_path))
         document = word.Documents.Open(FileName=document_path)
         document.SaveAs2(FileName=document_path + '.enc')
         document.Close(SaveChanges=0)

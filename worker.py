@@ -468,7 +468,7 @@ def do_resend(id: str | int, redirect: str = ''):
         depth=1,
         min_depth=1
     )))[-1]
-    logger.debug('found path: %s', work_path)
+    logger.info('found path: %s', work_path)
 
     # 对于current中获取的target，重发[分配审核]
     if isinstance(record['id'], str):

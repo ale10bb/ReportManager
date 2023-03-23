@@ -122,13 +122,14 @@ def do_attend():
     currents = mysql.t_current.search(page_size=9999)['current']
     # 24小时没有动作的情况下跳过信息输出
     if not currents and (datetime.datetime.now().timestamp() - mysql.t_history.pop()['end'] > 86400):
-        app.logger.debug('skipped output')
+        app.logger.info('skipped output')
         return
     queue = mysql.t_user.pop(count=9999, hide_busy=False)
     currents_group_by_user_id = {user['id']: [] for user in queue}
     for record in currents:
         currents_group_by_user_id[record['authorid']].append(
             '+'.join(record['names']))
+    app.logger.debug('currents: %s', currents_group_by_user_id)
 
     # 钉钉当前项目
     lines = []
@@ -186,6 +187,7 @@ def before_request():
 
 @app.errorhandler(400)
 def handle_BadRequest(err):
+    app.logger.info('BadRequest: %s', err.description)
     g.ret['result'] = 400
     g.ret['err'] = err.description
     return g.ret, 400
@@ -193,6 +195,7 @@ def handle_BadRequest(err):
 
 @app.errorhandler(KeyError)
 def handle_KeyError(err):
+    app.logger.info('KeyError: %s', err)
     g.ret['result'] = 400
     g.ret['err'] = f"Inappropriate key: {err}"
     return g.ret, 400
@@ -200,6 +203,7 @@ def handle_KeyError(err):
 
 @app.errorhandler(Exception)
 def handle_Exception(err):
+    app.logger.info('Exception: %s', err)
     g.ret['result'] = 3
     g.ret['err'] = str(err)
     return g.ret, 500
