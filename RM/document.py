@@ -144,15 +144,29 @@ def read_XT13(work_path: str) -> Attachment:
     document_paths = file_paths(filtered_walk(
         work_path, included_files=['*XT13*.docx', '*签发意见单*.docx'], excluded_files=['~$*']
     ))
+    word = win32com.client.gencache.EnsureDispatch('Word.Application')
     for document_path in document_paths:
         logger.info('reading "%s"', os.path.basename(document_path))
-        # 仅从文件名读编号
-        re_result = re.search(
-            'SHTEC20[0-9]{2}(PRO|PST|DSYS|SOF|SRV|PER|FUN)[0-9]{4}([-_][0-9]+){0,1}', os.path.basename(document_path))
-        if re_result:
-            ret['names'][re_result.group()] = 'Unknown'
-            logger.info('code: %s', re_result.group())
-
+        code = ''
+        name = ''
+        document = None
+        try:
+            document = word.Documents.Open(FileName=document_path)
+            re_result = re.search(
+                'SHTEC20[0-9]{2}(PRO|PST|DSYS|SOF|SRV|PER|FUN)[0-9]{4}([-_][0-9]+){0,1}', document.Paragraphs(1).Range.Text)
+            if re_result:
+                code = re_result.group()
+                logger.info('code: %s', code)
+                name = document.Tables(1).Cell(2, 2).Range.Text
+                name = re.sub('(\r|\n|\x07| *)', '', name)
+                logger.info('name: %s', name)
+                ret['names'][code] = name
+        except Exception:
+            logger.warning('read failed', exc_info=True)
+        finally:
+            if document:
+                document.Close(SaveChanges=0)
+        
     logger.debug('return: %s', ret)
     return ret
 
