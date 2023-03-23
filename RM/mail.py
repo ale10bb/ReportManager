@@ -190,37 +190,39 @@ class Mail:
         logger.debug('return: %s', parsed_mail)
         return parsed_mail
 
-    def send(self, recipient: str, subject: str, content: str, attachment: str = '', needs_cc: bool = False, to_stdout: bool = False):
+    def send(self, recipient: str, subject: str, content: str, attachments: list[str] | None = None, needs_cc: bool = False, to_stdout: bool = False):
         ''' 发送邮件
 
         Args:
-            recipient(str): 对象邮箱
-            subject(str): 邮件主题
-            content(str): 邮件内容
-            attachment(str): 附件文件路径（绝对路径）（可选）
-            needs_cc(bool): 是否抄送管理员（可选/默认值False）
-            to_stdout(bool): 是否将邮件重定向到stdout（可选/默认值False）
+            recipient: 对象邮箱
+            subject: 邮件主题
+            content: 邮件内容
+            attachments: 附件文件路径（绝对路径）（可选）
+            needs_cc: 是否抄送管理员（可选/默认值False）
+            to_stdout: 是否将邮件重定向到stdout（可选/默认值False）
         '''
         logger = logging.getLogger(__name__)
         logger.debug('args: %s', {
             'recipient': recipient,
             'subject': subject,
             'content': content,
-            'attachment': attachment,
+            'attachments': attachments,
             'needs_cc': needs_cc,
             'to_stdout': to_stdout,
         })
+
+        if not attachments:
+            attachments = []
+        for attachment in attachments:
+            logger.debug('size of "{}": {:.2}MB'.format(
+                os.path.basename(attachment), os.path.getsize(attachment) / 1048576))
 
         mail = {
             'subject': subject,
             'from': formataddr((Header('审核管理机器人', 'utf-8').encode(), self._smtp_config['username'])),
             'content_text': content,
-            'attachments': [attachment]
+            'attachments': attachments
         }
-        logger.debug('mail: %s', mail)
-        logger.debug('size of "{}": {:.2}MB'.format(
-            os.path.basename(attachment), os.path.getsize(attachment) / 1048576))
-
         if to_stdout:
             logger.warning('redirect to stdout and return')
             return

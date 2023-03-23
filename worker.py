@@ -184,9 +184,13 @@ def do_mail(parsed_mail: Parsed_Mail):
         )
         check_result['content'] = ret['content']
         check_result['warnings'] += ret['warnings']
-        for item in archive.extract(os.path.join(parsed_mail['temp_path'], 'attachments')):
-            check_result['warnings'].append(
-                f"解压失败：\"{os.path.basename(item)}\"")
+        work_path = os.path.join(parsed_mail['temp_path'], 'attachments')
+        for archive_path in file_paths(filtered_walk(work_path, included_files=['*.rar', '*.zip', '*.7z'])):
+            if not archive.extract(work_path, archive_path):
+                check_result['warnings'].append(
+                    f"解压失败：\"{os.path.basename(archive_path)}\"")
+            else:
+                os.remove(archive_path)
         #   未从附件中读取到有效文档
         ret = validator.check_mail_attachment(
             os.path.join(parsed_mail['temp_path'], 'attachments'), parsed_mail['operator'])
@@ -280,6 +284,7 @@ def handle_submit(work_path: str, content: Content, attachment: Attachment, warn
     logger.debug('record: %s', record)
     logger.info('(submit) "%s" -> "%s"',
                 record['authorid'], record['reviewerid'])
+    codes = '+'.join(sorted(record['names']))
     # 生成XT13
     for code, project_name in record['names'].items():
         document.gen_XT13(
@@ -295,7 +300,7 @@ def handle_submit(work_path: str, content: Content, attachment: Attachment, warn
         '{}_{}_{}'.format(
             datetime.datetime.now().timestamp(),
             record['authorid'],
-            '+'.join(sorted(record['names'])),
+            codes,
         )
     )
     logger.info('new work_path: %s', new_work_path)
@@ -307,17 +312,24 @@ def handle_submit(work_path: str, content: Content, attachment: Attachment, warn
         shutil.copy(file_path, new_work_path)
         logger.info('copied "%s"', os.path.basename(file_path))
     shutil.rmtree(work_path)
-    archive_path = archive.archive(
-        new_work_path, '+'.join(sorted(record['names'])))
+    # 发送邮件及通知
+    archive_path = os.path.join(new_work_path, f"{codes}.rar")
+    if not archive.archive(new_work_path, archive_path):
+        warnings.append(
+            f"压缩失败：\"{os.path.basename(new_work_path)}\"")
+        attachments = list(file_paths(filtered_walk(new_work_path)))
+    else:
+        attachments = [archive_path]
     message = notification.build_submit_mail(record, warnings)
     mail.send(
         mysql.t_user.fetch(record['reviewerid'])['email'],
         message['subject'],
         message['content'],
-        archive_path,
+        attachments,
         to_stdout=debug,
     )
-    os.remove(archive_path)
+    if os.path.exists(archive_path):
+        os.remove(archive_path)
     message = notification.build_submit_dingtalk(record, warnings)
     dingtalk.send_markdown(
         message['subject'],
@@ -363,12 +375,9 @@ def handle_finish(work_path: str, content: Content, attachment: Attachment, warn
     logger.debug('record: %s', record)
     logger.info('(finish) "%s" <- "%s"',
                 record['authorid'], record['reviewerid'])
+    codes = '+'.join(sorted(record['names']))
     # 将文件移动至archive中，重名时清除上一条记录
-    new_work_path = os.path.join(
-        storage,
-        'archive',
-        '+'.join(sorted(record['names'])),
-    )
+    new_work_path = os.path.join(storage, 'archive', codes)
     logger.info('new work_path: %s', new_work_path)
     if os.path.isdir(new_work_path):
         shutil.rmtree(new_work_path)
@@ -383,7 +392,7 @@ def handle_finish(work_path: str, content: Content, attachment: Attachment, warn
     shutil.rmtree(work_path)
     for dir_path in dir_paths(filtered_walk(
         os.path.join(storage, 'temp'),
-        included_dirs=['*' + '+'.join(sorted(record['names']))],
+        included_dirs=['*' + codes],
         depth=1,
         min_depth=1,
     )):
@@ -391,19 +400,25 @@ def handle_finish(work_path: str, content: Content, attachment: Attachment, warn
     # 加密文件
     for document_path in file_paths(filtered_walk(new_work_path, included_files=['*.doc', '*.docx'])):
         document.encrypt(document_path)
-
-    archive_path = archive.archive(
-        new_work_path, '+'.join(sorted(record['names'])))
+    # 发送邮件及通知
+    archive_path = os.path.join(new_work_path, f"{codes}.rar")
+    if not archive.archive(new_work_path, archive_path):
+        warnings.append(
+            f"压缩失败：\"{os.path.basename(new_work_path)}\"")
+        attachments = list(file_paths(filtered_walk(new_work_path)))
+    else:
+        attachments = [archive_path]
     message = notification.build_finish_mail(record, warnings)
     mail.send(
         mysql.t_user.fetch(record['authorid'])['email'],
         message['subject'],
         message['content'],
-        archive_path,
+        attachments,
         to_stdout=debug,
         needs_cc=True,
     )
-    os.remove(archive_path)
+    if os.path.exists(archive_path):
+        os.remove(archive_path)
     message = notification.build_finish_dingtalk(record, warnings)
     dingtalk.send_markdown(
         message['subject'],
@@ -467,15 +482,20 @@ def do_resend(id: str | int, redirect: str = ''):
         logger.info('resending "%s" (完成审核) to "%s"', codes, to)
 
     # 发送并清理临时文件
-    archive_path = archive.archive(work_path, codes)
+    archive_path = os.path.join(work_path, f"{codes}.rar")
+    if not archive.archive(work_path, archive_path):
+        attachments = list(file_paths(filtered_walk(work_path)))
+    else:
+        attachments = [archive_path]
     mail.send(
         to,
         resend_notification['subject'],
         resend_notification['content'],
-        archive_path,
+        attachments,
         to_stdout=debug,
     )
-    os.remove(archive_path)
+    if os.path.exists(archive_path):
+        os.remove(archive_path)
 
 
 if __name__ == "__main__":
