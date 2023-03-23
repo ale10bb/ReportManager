@@ -58,6 +58,7 @@ def search(page_index: int = 1, page_size: int = 10, **kwargs) -> Histories:
             LEFT JOIN user u_a ON h.authorid = u_a.id
             LEFT JOIN user u_r ON h.reviewerid = u_r.id 
             WHERE 1=1{condition}
+            ORDER BY h.id DESC
             LIMIT %s OFFSET %s
         '''
         cursor.execute(sql, params + [page_size, page_size * (page_index - 1)])
