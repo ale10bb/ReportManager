@@ -96,17 +96,16 @@ def check_mail_content(from_: str, subject: str, content: str, timestamp: int) -
             continue
         if cmds[0] == '组员':
             excludes = []
-            members = cmds[1].split('、')
             # 检查组员并修改为user_id
             for member in cmds[1].split('、'):
-                excludes.extend(
-                    mysql.t_user.search(user_id=member, only_reviewer=True) +
-                    mysql.t_user.search(name=member, only_reviewer=True)
-                )
-            excludes = [i[0] for i in excludes]
-            if len(members) != len(excludes):
-                ret['warnings'].append(
-                    f"已去除无效组员 {members} -> {excludes}")
+                user = mysql.t_user.fetch(member)
+                if user and user['role'] == 1:
+                    excludes.append(user['id'])
+                else:
+                    users = mysql.t_user.search(name=member, only_reviewer=True)
+                    if len(users) == 1:
+                        excludes.append(users[0]['id'])
+            excludes = list(set(excludes))
             logger.info('excludes: %s', excludes)
             continue
         if cmds[0] == '指定':
@@ -126,9 +125,9 @@ def check_mail_content(from_: str, subject: str, content: str, timestamp: int) -
     # “指定”回滚逻辑：
     #   指定了自己或组员
     if force == ret['content']['user_id'] or force in excludes:
-        force = ''
-        ret['warnings'].append('指定失败: 项目相关人员')
+        ret['warnings'].append(f"指定\"{force}\"失败: 项目相关人员")
         logger.warning('rallbacked force due to "in excludes"')
+        force = ''
     ret['content']['urgent'] = urgent
     ret['content']['excludes'] = excludes
     ret['content']['force'] = force
