@@ -118,7 +118,7 @@ class Mail:
                     'timestamp': int(mail['date'].timestamp()),
                     'from_': parseaddr(mail['from'])[1],
                     'subject': mail['subject'],
-                    'content': mail['content_text'],
+                    'content': mail['content_text'][0],
                     'temp_path': ''
                 }
                 parsed_mail['temp_path'] = os.path.join(
@@ -176,7 +176,7 @@ class Mail:
             'timestamp': int(mail['date'].timestamp()),
             'from_': parseaddr(mail['from'])[1],
             'subject': mail['subject'],
-            'content': mail['content_text'],
+            'content': mail['content_text'][0],
             'temp_path': temp_path,
         }
         if not os.path.exists(os.path.join(temp_path, 'attachments')):
