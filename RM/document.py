@@ -188,7 +188,7 @@ def gen_XT13(authorname: str, code: str, project_name: str, target_path):
         'target_path': target_path,
     })
 
-    logger.info('generating XT13 for "%s" to ""', code, target_path)
+    logger.info('generating XT13 for "%s" to "%s"', code, target_path)
     try:
         # 根据项目编号读取不同的审核意见单模板
         if 'PRO' in code or 'PST' in code:
