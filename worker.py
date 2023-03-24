@@ -159,7 +159,7 @@ def init(config):
 
 def do_mail(parsed_mail: Parsed_Mail):
     ''' 邮件处理入口，功能包括：
-    
+
     1. 邮件检查
     2. 数据库操作
     3. 发送通知
@@ -188,28 +188,29 @@ def do_mail(parsed_mail: Parsed_Mail):
         )
         check_result['content'] = ret['content']
         check_result['warnings'] += ret['warnings']
-        work_path = os.path.join(parsed_mail['temp_path'], 'attachments')
-        for archive_path in file_paths(filtered_walk(work_path, included_files=['*.rar', '*.zip', '*.7z'])):
-            if not archive.extract(work_path, archive_path):
+        attachments_path = os.path.join(
+            parsed_mail['temp_path'], 'attachments')
+        for archive_path in file_paths(filtered_walk(attachments_path, included_files=['*.rar', '*.zip', '*.7z'])):
+            if not archive.extract(attachments_path, archive_path):
                 check_result['warnings'].append(
                     f"解压失败：\"{os.path.basename(archive_path)}\"")
             else:
                 os.remove(archive_path)
         #   未从附件中读取到有效文档
         ret = validator.check_mail_attachment(
-            os.path.join(parsed_mail['temp_path'], 'attachments'), parsed_mail['operator'])
+            attachments_path, parsed_mail['operator'])
         check_result['attachment'] = ret['attachment']
         check_result['warnings'] += ret['warnings']
         if parsed_mail['operator'] == 'submit':
             handle_submit(
-                temp_path,
+                parsed_mail['temp_path'],
                 check_result['content'],
                 check_result['attachment'],
                 check_result['warnings']
             )
         elif parsed_mail['operator'] == 'finish':
             handle_finish(
-                temp_path,
+                parsed_mail['temp_path'],
                 check_result['content'],
                 check_result['attachment'],
                 check_result['warnings']
