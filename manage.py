@@ -353,11 +353,11 @@ def search_history():
                 if len(users) == 1:
                     kwargs['authorid'] = users[0]['id']
         elif key == 'current':
-            if not isinstance(value, int):
+            if not isinstance(value, int) or value <= 0:
                 abort(400, 'Inappropriate argument: current')
             kwargs['page_index'] = value
         elif key == 'pageSize':
-            if not isinstance(value, int):
+            if not isinstance(value, int) or value <= 0:
                 abort(400, 'Inappropriate argument: pageSize')
             kwargs['page_size'] = value
     g.ret['data'] = mysql.t_history.search(**kwargs)
