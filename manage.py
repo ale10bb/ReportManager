@@ -125,11 +125,11 @@ def do_attend():
         app.logger.info('skipped output')
         return
     queue = mysql.t_user.pop(count=9999, hide_busy=False)
-    currents_group_by_user_id = {user['id']: [] for user in queue}
+    currents_group_by_reviewerid = {user['id']: [] for user in queue}
     for record in currents:
-        currents_group_by_user_id[record['authorid']].append(
+        currents_group_by_reviewerid[record['reviewerid']].append(
             '+'.join(record['names']))
-    app.logger.debug('currents: %s', currents_group_by_user_id)
+    app.logger.debug('currents: %s', currents_group_by_reviewerid)
 
     # 钉钉当前项目
     lines = []
@@ -167,9 +167,9 @@ def do_attend():
             idx + 1 if user['skipped'] == 0 else '跳过一篇',
             f" (+{user['pages_diff']}页)" if user['pages_diff'] else ''
         )
-        if currents_group_by_user_id[user['id']]:
+        if currents_group_by_reviewerid[user['id']]:
             content += f"\n你当前有{user['current']}个审核任务:\n" + \
-                '\n'.join(currents_group_by_user_id[user['id']])
+                '\n'.join(currents_group_by_reviewerid[user['id']])
         wxwork.send_text(content, to=[user['id']], to_stdout=debug)
 
 
