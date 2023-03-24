@@ -104,7 +104,7 @@ def build_submit_wxwork(record: CurrentRecord, warnings: list[str]) -> Built_Mes
     ret: Built_Message = {'subject': '', 'content': ''}
     urgent = '是' if record['urgent'] else '否'
     ret['content'] = (
-        '==== 报告分配审核 ====\n\n'
+        '- [报告分配审核] -\n\n'
         '项目编号\n'
         '{}\n'
         '页数\n'
@@ -228,7 +228,7 @@ def build_finish_wxwork(record: HistoryRecord, warnings: list[str]) -> Built_Mes
     # 企业微信通知内容
     ret: Built_Message = {'subject': '', 'content': ''}
     ret['content'] = (
-        '==== 报告完成审核 ====\n\n'
+        '- [报告完成审核] -\n\n'
         '项目编号\n'
         '{}\n'
         '交还\n'
