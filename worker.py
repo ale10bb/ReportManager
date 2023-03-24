@@ -201,6 +201,25 @@ def do_mail(parsed_mail: Parsed_Mail):
             attachments_path, parsed_mail['operator'])
         check_result['attachment'] = ret['attachment']
         check_result['warnings'] += ret['warnings']
+    except Exception as err:
+        user_id = check_result['content']['user_id'] \
+            if 'user_id' in check_result['content'] else 'unknown'
+        logger.error('do_mail(%s) failed.', user_id, exc_info=True)
+        dingtalk.send_markdown(
+            '[RM] 处理异常',
+            f"({user_id}) {err}",
+            to_debug=True,
+            to_stdout=debug
+        )
+        wxwork.send_text(
+            f"({user_id}) {err}",
+            [],
+            to_debug=True,
+            to_stdout=debug,
+        )
+        raise
+    else:
+        # Step 2: 进行数据库操作、发送通知步骤
         if parsed_mail['operator'] == 'submit':
             handle_submit(
                 parsed_mail['temp_path'],
@@ -217,27 +236,11 @@ def do_mail(parsed_mail: Parsed_Mail):
             )
         else:
             raise ValueError('Invalid operator.')
-    except Exception as err:
-        user = check_result['content']['user_id'] if 'content' in check_result else 'unknown'
-        logger.error('do_mail(%s) failed.', user, exc_info=True)
-        dingtalk.send_markdown(
-            '[RM] 处理异常',
-            f"({user}) {err}",
-            to_debug=True,
-            to_stdout=debug
-        )
-        wxwork.send_text(
-            f"({user}) {err}",
-            [],
-            to_debug=True,
-            to_stdout=debug,
-        )
-        raise
     finally:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         mysql.t_log.add_mail(
             check_result['warnings'],
-            str(exc_value),
+            str(exc_value) if exc_type else '',
             parsed_mail,
             check_result['content'],
             check_result['attachment'],
@@ -261,93 +264,111 @@ def handle_submit(work_path: str, content: Content, attachment: Attachment, warn
         'work_path': work_path, 'content': content, 'attachment': attachment, 'warnings': warnings
     })
 
-    attachments_path = os.path.join(work_path, 'attachments')
-    # 在current表中插入项目
-    if content['force']:
-        # 如果有指定审核人，直接设置为该人
-        reviewer_id = content['force']
-    else:
-        # 否则获取下一顺位的审核人，传入的excludes拼接了组员和自己
-        reviewer_id = mysql.t_user.pop(
-            excludes=content['excludes'] +
-            [content['user_id']],
-            urgent=content['urgent'],
-        )[0]['id']
-    mysql.t_current.add(
-        attachment['names'],
-        attachment['company'],
-        attachment['pages'],
-        content['urgent'],
-        content['user_id'],
-        reviewer_id,
-        content['timestamp'],
-    )
-    # 从current表中取回操作结果record
-    record = mysql.t_current.fetch_by_name(attachment['names'])
-    if not record:
-        raise RuntimeError('Cannot fetch record.')
-    logger.debug('record: %s', record)
-    logger.info('(submit) "%s" -> "%s"',
-                record['authorid'], record['reviewerid'])
-    codes = '+'.join(sorted(record['names']))
-    # 生成XT13
-    for code, project_name in record['names'].items():
-        document.gen_XT13(
-            record['authorname'],
-            code,
-            project_name,
-            os.path.join(attachments_path, f"RD-XT13测评报告审核、签发意见单{code}.docx"),
+    try:
+        attachments_path = os.path.join(work_path, 'attachments')
+        # 在current表中插入项目
+        if content['force']:
+            # 如果有指定审核人，直接设置为该人
+            reviewer_id = content['force']
+        else:
+            # 否则获取下一顺位的审核人，传入的excludes拼接了组员和自己
+            reviewer_id = mysql.t_user.pop(
+                excludes=content['excludes'] +
+                [content['user_id']],
+                urgent=content['urgent'],
+            )[0]['id']
+        mysql.t_current.add(
+            attachment['names'],
+            attachment['company'],
+            attachment['pages'],
+            content['urgent'],
+            content['user_id'],
+            reviewer_id,
+            content['timestamp'],
         )
-    # 清理文件并重命名文件夹
-    new_work_path = os.path.join(
-        storage,
-        'temp',
-        '{}_{}_{}'.format(
-            datetime.datetime.now().timestamp(),
-            record['authorid'],
-            codes,
+        # 从current表中取回操作结果record
+        record = mysql.t_current.fetch_by_name(attachment['names'])
+        if not record:
+            raise RuntimeError('Cannot fetch record.')
+        logger.debug('record: %s', record)
+        logger.info('(submit) "%s" -> "%s"',
+                    record['authorid'], record['reviewerid'])
+        codes = '+'.join(sorted(record['names']))
+        # 生成XT13
+        for code, project_name in record['names'].items():
+            document.gen_XT13(
+                record['authorname'],
+                code,
+                project_name,
+                os.path.join(attachments_path,
+                             f"RD-XT13测评报告审核、签发意见单{code}.docx"),
+            )
+        # 清理文件并重命名文件夹
+        new_work_path = os.path.join(
+            storage,
+            'temp',
+            '{}_{}_{}'.format(
+                datetime.datetime.now().timestamp(),
+                record['authorid'],
+                codes,
+            )
         )
-    )
-    logger.info('new work_path: %s', new_work_path)
-    os.mkdir(new_work_path)
-    for file_path in file_paths(filtered_walk(
-            attachments_path,
-            included_files=['*.doc', '*.docx', '*.rar', '*.zip', '*.7z'],
-            excluded_files=['~$*'])):
-        shutil.copy(file_path, new_work_path)
-        logger.info('copied "%s"', os.path.basename(file_path))
-    shutil.rmtree(work_path)
-    # 发送邮件及通知
-    archive_path = os.path.join(new_work_path, f"{codes}.rar")
-    if not archive.archive(new_work_path, archive_path):
-        warnings.append(
-            f"压缩失败：\"{os.path.basename(new_work_path)}\"")
-        attachments = list(file_paths(filtered_walk(new_work_path)))
-    else:
-        attachments = [archive_path]
-    message = notification.build_submit_mail(record, warnings)
-    mail.send(
-        mysql.t_user.fetch(record['reviewerid'])['email'],
-        message['subject'],
-        message['content'],
-        attachments,
-        to_stdout=debug,
-    )
-    if os.path.exists(archive_path):
-        os.remove(archive_path)
-    message = notification.build_submit_dingtalk(record, warnings)
-    dingtalk.send_markdown(
-        message['subject'],
-        message['content'],
-        mysql.t_user.fetch(record['reviewerid'])['phone'],
-        to_stdout=debug,
-    )
-    message = notification.build_submit_wxwork(record, warnings)
-    wxwork.send_text(
-        message['content'],
-        [record['authorid'], record['reviewerid']],
-        to_stdout=debug,
-    )
+        logger.info('new work_path: %s', new_work_path)
+        os.mkdir(new_work_path)
+        for file_path in file_paths(filtered_walk(
+                attachments_path,
+                included_files=['*.doc', '*.docx', '*.rar', '*.zip', '*.7z'],
+                excluded_files=['~$*'])):
+            shutil.copy(file_path, new_work_path)
+            logger.info('copied "%s"', os.path.basename(file_path))
+        shutil.rmtree(work_path)
+        # 发送邮件及通知
+        archive_path = os.path.join(new_work_path, f"{codes}.rar")
+        if not archive.archive(new_work_path, archive_path):
+            warnings.append(
+                f"压缩失败：\"{os.path.basename(new_work_path)}\"")
+            attachments = list(file_paths(filtered_walk(new_work_path)))
+        else:
+            attachments = [archive_path]
+        message = notification.build_submit_mail(record, warnings)
+        mail.send(
+            mysql.t_user.fetch(record['reviewerid'])['email'],
+            message['subject'],
+            message['content'],
+            attachments,
+            to_stdout=debug,
+        )
+        if os.path.exists(archive_path):
+            os.remove(archive_path)
+        message = notification.build_submit_dingtalk(record, warnings)
+        dingtalk.send_markdown(
+            message['subject'],
+            message['content'],
+            mysql.t_user.fetch(record['reviewerid'])['phone'],
+            to_stdout=debug,
+        )
+        message = notification.build_submit_wxwork(record, warnings)
+        wxwork.send_text(
+            message['content'],
+            [record['authorid'], record['reviewerid']],
+            to_stdout=debug,
+        )
+    except Exception as err:
+        user_id = content['user_id']
+        logger.error('handle_submit(%s) failed.', user_id, exc_info=True)
+        dingtalk.send_markdown(
+            '[RM] 处理异常',
+            f"({user_id}) {err}",
+            to_debug=True,
+            to_stdout=debug
+        )
+        wxwork.send_text(
+            f"({user_id}) {err}",
+            [],
+            to_debug=True,
+            to_stdout=debug,
+        )
+        raise
 
 
 def handle_finish(work_path: str, content: Content, attachment: Attachment, warnings: list[str]):
@@ -367,76 +388,93 @@ def handle_finish(work_path: str, content: Content, attachment: Attachment, warn
         'work_path': work_path, 'content': content, 'attachment': attachment, 'warnings': warnings
     })
 
-    attachments_path = os.path.join(work_path, 'attachments')
-    #   在current表中删除项目
-    mysql.t_current.finish_by_name(
-        attachment['names'], content['timestamp'])
-    # 从history中取回操作结果record
-    # 由于插入history时不检测唯一性，search结果可能重复。在此取第一个结果作为有效返回
-    record = mysql.t_history.search(
-        page_size=1,
-        code='+'.join(attachment['names'])
-    )['history'][0]
-    logger.debug('record: %s', record)
-    logger.info('(finish) "%s" <- "%s"',
-                record['authorid'], record['reviewerid'])
-    codes = '+'.join(sorted(record['names']))
-    # 将文件移动至archive中，重名时清除上一条记录
-    new_work_path = os.path.join(storage, 'archive', codes)
-    logger.info('new work_path: %s', new_work_path)
-    if os.path.isdir(new_work_path):
-        shutil.rmtree(new_work_path)
-    os.mkdir(new_work_path)
-    for file_path in file_paths(filtered_walk(
-            attachments_path,
-            included_files=['*.doc', '*.docx', '*.rar', '*.zip', '*.7z'],
-            excluded_files=['~$*'])):
-        shutil.copy(file_path, new_work_path)
-        logger.info('copied "%s"', os.path.basename(file_path))
-    # 清理并同时删除temp中的提交审核记录
-    shutil.rmtree(work_path)
-    for dir_path in dir_paths(filtered_walk(
-        os.path.join(storage, 'temp'),
-        included_dirs=['*' + codes],
-        depth=1,
-        min_depth=1,
-    )):
-        shutil.rmtree(dir_path)
-    # 加密文件
-    for document_path in file_paths(filtered_walk(new_work_path, included_files=['*.doc', '*.docx'])):
-        document.encrypt(document_path)
-    # 发送邮件及通知
-    archive_path = os.path.join(new_work_path, f"{codes}.rar")
-    if not archive.archive(new_work_path, archive_path):
-        warnings.append(
-            f"压缩失败：\"{os.path.basename(new_work_path)}\"")
-        attachments = list(file_paths(filtered_walk(new_work_path)))
-    else:
-        attachments = [archive_path]
-    message = notification.build_finish_mail(record, warnings)
-    mail.send(
-        mysql.t_user.fetch(record['authorid'])['email'],
-        message['subject'],
-        message['content'],
-        attachments,
-        to_stdout=debug,
-        needs_cc=True,
-    )
-    if os.path.exists(archive_path):
-        os.remove(archive_path)
-    message = notification.build_finish_dingtalk(record, warnings)
-    dingtalk.send_markdown(
-        message['subject'],
-        message['content'],
-        mysql.t_user.fetch(record['authorid'])['phone'],
-        to_stdout=debug,
-    )
-    message = notification.build_finish_wxwork(record, warnings)
-    wxwork.send_text(
-        message['content'],
-        [record['authorid'], record['reviewerid']],
-        to_stdout=debug,
-    )
+    try:
+        attachments_path = os.path.join(work_path, 'attachments')
+        #   在current表中删除项目
+        mysql.t_current.finish_by_name(
+            attachment['names'], content['timestamp'])
+        # 从history中取回操作结果record
+        # 由于插入history时不检测唯一性，search结果可能重复。在此取第一个结果作为有效返回
+        record = mysql.t_history.search(
+            page_size=1,
+            code='+'.join(attachment['names'])
+        )['history'][0]
+        logger.debug('record: %s', record)
+        logger.info('(finish) "%s" <- "%s"',
+                    record['authorid'], record['reviewerid'])
+        codes = '+'.join(sorted(record['names']))
+        # 将文件移动至archive中，重名时清除上一条记录
+        new_work_path = os.path.join(storage, 'archive', codes)
+        logger.info('new work_path: %s', new_work_path)
+        if os.path.isdir(new_work_path):
+            shutil.rmtree(new_work_path)
+        os.mkdir(new_work_path)
+        for file_path in file_paths(filtered_walk(
+                attachments_path,
+                included_files=['*.doc', '*.docx', '*.rar', '*.zip', '*.7z'],
+                excluded_files=['~$*'])):
+            shutil.copy(file_path, new_work_path)
+            logger.info('copied "%s"', os.path.basename(file_path))
+        # 清理并同时删除temp中的提交审核记录
+        shutil.rmtree(work_path)
+        for dir_path in dir_paths(filtered_walk(
+            os.path.join(storage, 'temp'),
+            included_dirs=['*' + codes],
+            depth=1,
+            min_depth=1,
+        )):
+            shutil.rmtree(dir_path)
+        # 加密文件
+        for document_path in file_paths(filtered_walk(new_work_path, included_files=['*.doc', '*.docx'])):
+            document.encrypt(document_path)
+        # 发送邮件及通知
+        archive_path = os.path.join(new_work_path, f"{codes}.rar")
+        if not archive.archive(new_work_path, archive_path):
+            warnings.append(
+                f"压缩失败：\"{os.path.basename(new_work_path)}\"")
+            attachments = list(file_paths(filtered_walk(new_work_path)))
+        else:
+            attachments = [archive_path]
+        message = notification.build_finish_mail(record, warnings)
+        mail.send(
+            mysql.t_user.fetch(record['authorid'])['email'],
+            message['subject'],
+            message['content'],
+            attachments,
+            to_stdout=debug,
+            needs_cc=True,
+        )
+        if os.path.exists(archive_path):
+            os.remove(archive_path)
+        message = notification.build_finish_dingtalk(record, warnings)
+        dingtalk.send_markdown(
+            message['subject'],
+            message['content'],
+            mysql.t_user.fetch(record['authorid'])['phone'],
+            to_stdout=debug,
+        )
+        message = notification.build_finish_wxwork(record, warnings)
+        wxwork.send_text(
+            message['content'],
+            [record['authorid'], record['reviewerid']],
+            to_stdout=debug,
+        )
+    except Exception as err:
+        user_id = content['user_id']
+        logger.error('handle_finish(%s) failed.', user_id, exc_info=True)
+        dingtalk.send_markdown(
+            '[RM] 处理异常',
+            f"({user_id}) {err}",
+            to_debug=True,
+            to_stdout=debug
+        )
+        wxwork.send_text(
+            f"({user_id}) {err}",
+            [],
+            to_debug=True,
+            to_stdout=debug,
+        )
+        raise
 
 
 def do_resend(id: str | int, redirect: str = ''):
