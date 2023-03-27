@@ -296,6 +296,10 @@ def handle_submit(work_path: str, content: Content, attachment: Attachment, warn
         codes = '+'.join(sorted(record['names']))
         # 生成XT13
         for code, project_name in record['names'].items():
+            # 已有XT13时不再重复生成
+            if os.path.exists(os.path.join(attachments_path,
+                                           f"RD-XT13测评报告审核、签发意见单{code}.docx")):
+                continue
             document.gen_XT13(
                 record['authorname'],
                 code,
