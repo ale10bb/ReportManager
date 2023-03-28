@@ -147,6 +147,10 @@ def add(names: dict[str, str], company: str, pages: int, urgent: bool, authorid:
             VALUES (%s, %s, %s, %s, %s, %s, %s, FROM_UNIXTIME(%s))
             ''', (current_id, json.dumps(names), company, pages, urgent, authorid, reviewerid, submit_timestamp)
         )
+        cursor.execute(
+            "UPDATE user SET pages = pages + %s WHERE id = %s", 
+            (int(pages * 1.5) if urgent else pages, reviewerid)
+        )
 
 
 def edit(current_id: str, **kwargs):
