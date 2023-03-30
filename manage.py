@@ -405,7 +405,27 @@ def edit_current():
             if not isinstance(value, bool):
                 abort(400, 'Inappropriate argument: urgent')
             kwargs['urgent'] = value
+    # fetch时候忽略pylance的类型校验。若id无效，edit将报错退出
+    old_record = mysql.t_current.fetch(request.json['id'])
     mysql.t_current.edit(request.json['id'], **kwargs)
+    new_record = mysql.t_current.fetch(request.json['id'])
+    if old_record['reviewerid'] != new_record['reviewerid']:
+        content = (
+            '- [报告移交审核] -\n\n'
+            '项目编号\n'
+            '{}\n'
+            '移交\n'
+            '· {} -> {}'.format(
+                '\n'.join(['· ' + code for code in new_record['names']]),
+                old_record['reviewername'],
+                new_record['reviewername'],
+            )
+        )
+        wxwork.send_text(
+            content,
+            [new_record['authorid'], old_record['reviewerid'], new_record['reviewerid']],
+            to_stdout=debug,
+        )
     return g.ret
 
 
