@@ -114,7 +114,7 @@ def before_first_request():
 
 def do_attend():
     ''' 任务提醒入口，功能包括：
-    
+
     1. 向主通知群发送打卡提示，包含当前任务、分配队列和交互入口
     2. 向企业微信发送任务提醒
     '''
@@ -200,7 +200,7 @@ def handle_KeyError(err):
 
 @app.errorhandler(Exception)
 def handle_Exception(err):
-    app.logger.info('Exception: %s', err)
+    app.logger.info('Exception: %s', err, exc_info=True)
     g.ret['result'] = 3
     g.ret['err'] = str(err)
     return g.ret, 500
@@ -265,7 +265,7 @@ def cron():
     match request.args['type']:
         case 'mail':
             if chinese_calendar.is_workday(current) and current.hour >= 9 and current.hour < 17:
-                stream.add(command='receive', kwargs={})
+                stream.add(source='cron', name='receive')
         case 'attend':
             if chinese_calendar.is_workday(current):
                 do_attend()
@@ -285,13 +285,15 @@ def mail():
     finish_text = request.json.get('finish', '[完成审核]')
     if not isinstance(finish_text, str):
         abort(400, 'Inappropriate argument: finish')
-    stream.add(
-        command='receive',
-        kwargs={
+    entry_id = stream.add(
+        source=g.user_id,
+        name='receive',
+        fields={
             'submit': submit_text if len(submit_text) >= 5 else '[提交审核]',
             'finish': finish_text if len(finish_text) >= 5 else '[完成审核]',
         },
     )
+    g.ret['data']['entryid'] = entry_id
     return g.ret
 
 
@@ -302,13 +304,15 @@ def resend_history():
         abort(400, 'Inappropriate argument: id')
     if not isinstance(request.json.setdefault('to', ''), str):
         abort(400, 'Inappropriate argument: to')
-    stream.add(
-        command='resend',
-        kwargs={
+    entry_id = stream.add(
+        source=g.user_id,
+        name='resend',
+        fields={
             'id': request.json['id'],
             'redirect': request.json['to'],
         },
     )
+    g.ret['data']['entryid'] = entry_id
     return g.ret
 
 
@@ -319,13 +323,15 @@ def resend_current():
         abort(400, 'Inappropriate argument: id')
     if not isinstance(request.json.setdefault('to', ''), str):
         abort(400, 'Inappropriate argument: to')
-    stream.add(
-        command='resend',
-        kwargs={
+    entry_id = stream.add(
+        source=g.user_id,
+        name='resend',
+        fields={
             'id': request.json['id'],
             'redirect': request.json['to'],
         },
     )
+    g.ret['data']['entryid'] = entry_id
     return g.ret
 
 

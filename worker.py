@@ -558,31 +558,72 @@ if __name__ == "__main__":
     while True:
         # 默认阻塞当前进程，直到队列中出现可用的对象
         logger.debug('waiting stream')
-        item = stream.read()
-        logger.debug('new item "%s"', item['command'])
-        try:
-            if item['command'] == 'receive':
-                if not item['kwargs']:
-                    item['kwargs'] = {'submit': '[提交审核]', 'finish': '[完成审核]'}
-                if not isinstance(item['kwargs'].setdefault('submit', '[提交审核]'), str):
-                    item['kwargs']['submit'] = '[提交审核]'
-                if not isinstance(item['kwargs'].setdefault('finish', '[完成审核]'), str):
-                    item['kwargs']['finish'] = '[完成审核]'
-                parsed_mails = mail.receive(
-                    os.path.join(storage, 'temp'), item['kwargs'])
-                for parsed_mail in parsed_mails:
-                    do_mail(parsed_mail)
-            elif item['command'] == 'read':
-                temp_path = os.path.join(
-                    storage,
-                    'temp',
-                    os.path.basename(item['kwargs']['folder']),
-                )
-                parsed_mail = mail.read(temp_path)
-                if not parsed_mail:
-                    raise ValueError('invalid arg: folder')
-                do_mail(parsed_mail)
-            elif item['command'] == 'resend':
-                do_resend(**item['kwargs'])
-        except Exception as err:
-            logger.error(err, exc_info=True)
+        entries = stream.read()
+        for stream_entries in entries:
+            if stream_entries[0] == 'receive':
+                for message_id, message_fields in stream_entries[1]:
+                    logger.debug('new item in "%s": (%s) %s',
+                                 stream_entries[0], message_id, message_fields)
+                    try:
+                        keywords = {}
+                        keywords['submit'] = message_fields.get(
+                            'submit', '[提交审核]')
+                        keywords['finish'] = message_fields.get(
+                            'finish', '[完成审核]')
+                        if not isinstance(keywords['submit'], str):
+                            keywords['submit'] = '[提交审核]'
+                        if not isinstance(keywords['finish'], str):
+                            keywords['finish'] = '[完成审核]'
+                        parsed_mails = mail.receive(
+                            os.path.join(storage, 'temp'), keywords)
+                        for parsed_mail in parsed_mails:
+                            do_mail(parsed_mail)
+                    except Exception as err:
+                        logger.error(err, exc_info=True)
+                    finally:
+                        stream.ack('receive', message_id)
+                        if message_fields.get('source', '') != 'cron':
+                            text = f"- [任务结果] -\n\n信息: [邮件处理]完成\n编号: {message_id}"
+                            exc_type, exc_value, exc_traceback = sys.exc_info()
+                            text += f"\n错误信息: {exc_value}" if exc_type else ''
+                            wxwork.send_text(text, [message_fields['source']])
+            elif stream_entries[0] == 'read':
+                for message_id, message_fields in stream_entries[1]:
+                    logger.debug('new item in "%s": (%s) %s',
+                                 stream_entries[0], message_id, message_fields)
+                    try:
+                        temp_path = os.path.join(
+                            storage,
+                            'temp',
+                            os.path.basename(message_fields['folder']),
+                        )
+                        parsed_mail = mail.read(temp_path)
+                        if not parsed_mail:
+                            raise ValueError('invalid arg: folder')
+                        do_mail(parsed_mail)
+                    except Exception as err:
+                        logger.error(err, exc_info=True)
+                    finally:
+                        stream.ack('read', message_id)
+                        if message_fields.get('source', '') != 'cron':
+                            text = f"- [任务结果] -\n\n信息: [邮件处理(本地)]完成\n编号: {message_id}"
+                            exc_type, exc_value, exc_traceback = sys.exc_info()
+                            text += f"\n错误信息: {exc_value}" if exc_type else ''
+                            wxwork.send_text(text, [message_fields['source']])
+            elif stream_entries[0] == 'resend':
+                for message_id, message_fields in stream_entries[1]:
+                    logger.debug('new item in "%s": (%s) %s',
+                                 stream_entries[0], message_id, message_fields)
+                    try:
+                        do_resend(**message_fields)
+                    except Exception as err:
+                        logger.error(err, exc_info=True)
+                    finally:
+                        stream.ack('resend', message_id)
+                        if message_fields.get('source', '') != 'cron':
+                            text = f"- [任务结果] -\n\n信息: [重发邮件]完成\n编号: {message_id}"
+                            exc_type, exc_value, exc_traceback = sys.exc_info()
+                            text += f"\n错误信息: {exc_value}" if exc_type else ''
+                            wxwork.send_text(text, [message_fields['source']])
+            else:
+                logger.debug('invalid stream_entries: %s', stream_entries)
