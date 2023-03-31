@@ -578,7 +578,10 @@ if __name__ == "__main__":
                         parsed_mails = mail.receive(
                             os.path.join(storage, 'temp'), keywords)
                         for parsed_mail in parsed_mails:
-                            do_mail(parsed_mail)
+                            try:
+                                do_mail(parsed_mail)
+                            except Exception as err:
+                                text += f"\n错误信息: {err}"
                     except Exception as err:
                         logger.error(err, exc_info=True)
                         text += f"\n错误信息: {err}"
