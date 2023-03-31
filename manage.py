@@ -481,7 +481,8 @@ def list_queue():
 @app.route('/api/user/info', methods=['POST'])
 @jwt_required()
 def user_info():
-    for idx, item in enumerate(mysql.t_user.pop(count=9999, hide_busy=False)):
+    queue = mysql.t_user.pop(count=9999, hide_busy=False)
+    for idx, item in enumerate(queue):
         if item['id'] == g.user_id:
             g.ret['data']['user'] = item
             del g.ret['data']['user']['phone']
@@ -494,6 +495,13 @@ def user_info():
             g.ret['data']['user'] = ret
             del g.ret['data']['user']['phone']
             del g.ret['data']['user']['email']
+    g.ret['data']['next'] = {}
+    for item in queue:
+        if item['id'] != g.user_id and item['status'] != 2:
+            g.ret['data']['next'] = item
+            del g.ret['data']['next']['phone']
+            del g.ret['data']['next']['email']
+            break
     return g.ret
 
 
