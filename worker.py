@@ -564,6 +564,7 @@ if __name__ == "__main__":
                 for message_id, message_fields in stream_entries[1]:
                     logger.debug('new item in "%s": (%s) %s',
                                  stream_entries[0], message_id, message_fields)
+                    text = f"- [任务结果] -\n\n信息: [邮件处理]完成\nID: {message_id}"
                     try:
                         keywords = {}
                         keywords['submit'] = message_fields.get(
@@ -578,19 +579,18 @@ if __name__ == "__main__":
                             os.path.join(storage, 'temp'), keywords)
                         for parsed_mail in parsed_mails:
                             do_mail(parsed_mail)
+                    except Exception as err:
+                        logger.error(err, exc_info=True)
+                        text += f"\n错误信息: {err}"
                     finally:
                         stream.ack('receive', message_id)
                         if message_fields.get('source', '') != 'cron':
-                            text = f"- [任务结果] -\n\n信息: [邮件处理]完成\n编号: {message_id}"
-                            exc_type, exc_value, exc_traceback = sys.exc_info()
-                            if exc_type:
-                                text += f"\n错误信息: {exc_value}"
-                                logger.error('exc_value', exc_info=True)
                             wxwork.send_text(text, [message_fields['source']])
             elif stream_entries[0] == 'read':
                 for message_id, message_fields in stream_entries[1]:
                     logger.debug('new item in "%s": (%s) %s',
                                  stream_entries[0], message_id, message_fields)
+                    text = f"- [任务结果] -\n\n信息: [邮件处理(本地)]完成\n编号: {message_id}"
                     try:
                         temp_path = os.path.join(
                             storage,
@@ -601,33 +601,30 @@ if __name__ == "__main__":
                         if not parsed_mail:
                             raise ValueError('invalid arg: folder')
                         do_mail(parsed_mail)
+                    except Exception as err:
+                        logger.error(err, exc_info=True)
+                        text += f"\n错误信息: {err}"
                     finally:
                         stream.ack('read', message_id)
                         if message_fields.get('source', '') != 'cron':
-                            text = f"- [任务结果] -\n\n信息: [邮件处理(本地)]完成\n编号: {message_id}"
-                            exc_type, exc_value, exc_traceback = sys.exc_info()
-                            if exc_type:
-                                text += f"\n错误信息: {exc_value}"
-                                logger.error('exc_value', exc_info=True)
                             wxwork.send_text(text, [message_fields['source']])
             elif stream_entries[0] == 'resend':
                 for message_id, message_fields in stream_entries[1]:
                     logger.debug('new item in "%s": (%s) %s',
                                  stream_entries[0], message_id, message_fields)
+                    text = f"- [任务结果] -\n\n信息: [重发邮件]完成\n编号: {message_id}"
                     try:
                         if not isinstance(message_fields['id'], int | str):
                             raise TypeError('invalid arg: id')
                         if not isinstance(message_fields.setdefault('to', ''), str):
                             raise TypeError('invalid arg: to')
                         do_resend(message_fields['id'], message_fields['to'])
+                    except Exception as err:
+                        logger.error(err, exc_info=True)
+                        text += f"\n错误信息: {err}"
                     finally:
                         stream.ack('resend', message_id)
                         if message_fields.get('source', '') != 'cron':
-                            text = f"- [任务结果] -\n\n信息: [重发邮件]完成\n编号: {message_id}"
-                            exc_type, exc_value, exc_traceback = sys.exc_info()
-                            if exc_type:
-                                text += f"\n错误信息: {exc_value}"
-                                logger.error('exc_value', exc_info=True)
                             wxwork.send_text(text, [message_fields['source']])
             else:
                 logger.debug('invalid stream_entries: %s', stream_entries)
