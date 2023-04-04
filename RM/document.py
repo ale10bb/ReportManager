@@ -63,14 +63,9 @@ def read_document(work_path: str) -> Attachment:
             # 读取系统名称和委托单位
             if 'DSYS' in code:
                 logger.debug('reading DSYS')
-                # 系统名称在封面页的表格外面
-                for i in range(30):
-                    paragraph = document.Paragraphs(i+1).Range.Text.strip()
-                    if '等级测评报告' in paragraph:
-                        name = paragraph[:-6]
-                        break
-                # 从表格中读取委托单位
-                company = document.Tables(1).Cell(1, 2).Range.Text
+                # 从基本信息表中读取
+                name = document.Tables(2).Cell(2, 2).Range.Text
+                company = document.Tables(2).Cell(5, 2).Range.Text
             elif 'PRO' in code or 'PST' in code or 'PER' in code:
                 logger.debug('reading PRO/PST/PER')
                 # 直接从第一个表格中读取
