@@ -148,9 +148,9 @@ def do_attend():
     dingtalk.send_action_card(part1+'\n\n---\n\n'+part2, to_stdout=debug)
 
     # 微信个人通知
-    for idx, reviewer in enumerate(queue):
+    for reviewer in queue:
         # 顺位在3以后且没有项目的，跳过通知
-        if idx > 2 and reviewer['current'] == 0:
+        if reviewer['priority'] > 3 and reviewer['current'] == 0:
             continue
         if reviewer['status'] == 0:
             status = '空闲'
@@ -161,7 +161,7 @@ def do_attend():
         else:
             status = '未知'
         content = '- [审核队列] -\n\n你的顺位: {}{}\n你的状态: {}{}\n当前任务: {}'.format(
-            idx + 1,
+            reviewer['priority'],
             f" (+{reviewer['pages_diff']}页)" if reviewer['pages_diff'] else '',
             status,
             '（跳过一篇）' if reviewer['skipped'] == 1 else '',
@@ -482,12 +482,11 @@ def list_queue():
 @jwt_required()
 def user_info():
     queue = mysql.t_user.pop(count=9999, hide_busy=False)
-    for idx, item in enumerate(queue):
-        if item['id'] == g.user_id:
-            g.ret['data']['user'] = item
+    for reviewer in queue:
+        if reviewer['id'] == g.user_id:
+            g.ret['data']['user'] = reviewer
             del g.ret['data']['user']['phone']
             del g.ret['data']['user']['email']
-            g.ret['data']['user']['priority'] = idx + 1
             break
     else:
         ret = mysql.t_user.fetch(user_id=g.user_id)

@@ -14,6 +14,7 @@ class UserItem(TypedDict):
 
 
 class QueueItem(UserItem):
+    priority: int
     pages_diff: int
     current: int
     skipped: Literal[0, 1]

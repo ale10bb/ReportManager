@@ -98,7 +98,7 @@ def pop(count: int = 1, excludes: list[str] | None = None, urgent: bool = False,
         hide_busy: 是否隐藏status=2的审核人
 
     Returns:
-        list[QueueItem]：长度为{count}的列表，增加pages_diff、current、skipped值
+        list[QueueItem]：长度为{count}的列表，在UserItem之上增加priority、pages_diff、current、skipped键
     '''
     logger = logging.getLogger(__name__)
     logger.debug('args: %s', {
@@ -144,6 +144,8 @@ def pop(count: int = 1, excludes: list[str] | None = None, urgent: bool = False,
     if hide_busy:
         # 仅筛选列表中status=0和status=1的审核人
         ret = [item for item in ret if item['status'] != 2]
+    for idx, queue_item in enumerate(ret, start=1):
+        queue_item['priority'] = idx
 
     logger.debug('return: %s', ret[0:count])
     return ret[0:count]
