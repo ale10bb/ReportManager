@@ -3,7 +3,7 @@ FROM registry.cn-shanghai.aliyuncs.com/ale10bb/python:3.11-web-flask
 # requirements for RM
 RUN set -eux; \
         \
-        pip install --no-cache-dir mysql-connector-python redis DingtalkChatbot chinesecalendar flask-jwt-extended; \
+        pip install --no-cache-dir mysql-connector-python redis DingtalkChatbot chinesecalendar Flask flask-jwt-extended flask_cors; \
         pip install --no-cache-dir https://github.com/ale10bb/zmail/archive/refs/tags/v0.2.8.2.tar.gz
 
 # directory structure for RM

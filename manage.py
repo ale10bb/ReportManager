@@ -6,6 +6,7 @@ from flask_jwt_extended import create_access_token
 from flask_jwt_extended import get_jwt_identity
 from flask_jwt_extended import verify_jwt_in_request
 from flask_jwt_extended import JWTManager
+from flask_cors import CORS
 
 import os
 import ipaddress
@@ -22,7 +23,10 @@ app = Flask(__name__)
 app.config['JSON_AS_ASCII'] = False
 app.config['JWT_SECRET_KEY'] = os.urandom(12)
 app.config['JWT_ERROR_MESSAGE_KEY'] = 'err'
+app.config['CORS_ORIGINS'] = ['https://rm.chenql.cn', 'http://localhost:5173']
+app.config['CORS_RESOURCES'] = r'/api/*'
 jwt = JWTManager(app)
+cors = CORS(app)
 
 
 @app.before_first_request
@@ -255,7 +259,7 @@ def genToken():
 
 @app.route('/api/redirect', methods=['POST'])
 def get_redirect_url():
-    g.ret['data']['url'] = wxwork.get_redirect(host=request.host)
+    g.ret['data']['url'] = wxwork.get_redirect(host='rm.chenql.cn')
     return g.ret
 
 
@@ -507,6 +511,4 @@ def user_status():
 
 
 if __name__ == "__main__":
-    from flask_cors import CORS
-    CORS(app, resources={r"*": {"origins": "*"}})
     app.run(debug=True)
