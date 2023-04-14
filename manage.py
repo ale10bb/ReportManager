@@ -241,11 +241,17 @@ def auth():
     if mysql.t_user.__contains__(user_id):
         app.logger.info('grant access to "%s"', user_id)
         g.ret['data']['token'] = create_access_token(identity=user_id)
-        return g.ret
     else:
         g.ret['result'] = 401
         g.ret['err'] = 'invalid user'
-        return g.ret
+    mysql.t_log.add_manage(
+        g.client_ip,
+        user_id,
+        request.headers.get('User-Agent', ''),
+        request.path,
+        {}
+    )
+    return g.ret
 
 
 @app.route('/utils/genToken')
