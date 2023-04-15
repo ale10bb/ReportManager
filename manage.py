@@ -257,8 +257,12 @@ def auth():
 @app.route('/utils/genToken')
 def genToken():
     user_info = mysql.t_user.fetch(request.args['user_id'])
+    long_term = request.args.get('longTerm')
     if user_info:
-        return create_access_token(identity=user_info['id'], expires_delta=datetime.timedelta(days=1))
+        if isinstance(long_term, str):
+            return create_access_token(identity=user_info['id'], expires_delta=datetime.timedelta(days=1))
+        else:
+            return (create_access_token(identity=user_info['id']))
     else:
         return ''
 
