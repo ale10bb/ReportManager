@@ -238,9 +238,20 @@ def jwt_required():
 def auth():
     code = request.json.get('code', '')
     user_id = wxwork.get_userid(code)
-    if mysql.t_user.__contains__(user_id):
+    queue = mysql.t_user.pop(count=9999, hide_busy=False)
+    for reviewer in queue:
+        if reviewer['id'] == user_id:
+            g.ret['data']['user'] = reviewer
+            break
+    else:
+        ret = mysql.t_user.fetch(user_id)
+        if ret:
+            g.ret['data']['user'] = ret
+    if 'user' in g.ret['data']:
         app.logger.info('grant access to "%s"', user_id)
         g.ret['data']['token'] = create_access_token(identity=user_id)
+        del g.ret['data']['user']['phone']
+        del g.ret['data']['user']['email']
     else:
         g.ret['result'] = 401
         g.ret['err'] = 'invalid user'
