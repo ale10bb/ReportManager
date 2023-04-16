@@ -617,11 +617,9 @@ if __name__ == "__main__":
                                  stream_entries[0], message_id, message_fields)
                     text = f"- [任务结果] -\n\n信息: [重发邮件]完成\n编号: {message_id}"
                     try:
-                        if not isinstance(message_fields['id'], int | str):
-                            raise TypeError('invalid arg: id')
-                        if not isinstance(message_fields.setdefault('to', ''), str):
-                            raise TypeError('invalid arg: to')
-                        do_resend(message_fields['id'], message_fields['to'])
+                        record_id = int(message_fields['id']) \
+                            if message_fields['id'].isdigit() else message_fields['id']
+                        do_resend(record_id, message_fields.setdefault('redirect', ''))
                     except Exception as err:
                         logger.error(err, exc_info=True)
                         text += f"\n错误信息: {err}"
