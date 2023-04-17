@@ -280,7 +280,7 @@ def genToken():
 
 @app.route('/api/redirect', methods=['POST'])
 def get_redirect_url():
-    g.ret['data']['url'] = wxwork.get_redirect(host='rm.chenql.cn')
+    g.ret['data']['url'] = wxwork.get_redirect(host=request.host)
     return g.ret
 
 
