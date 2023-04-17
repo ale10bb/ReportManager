@@ -284,7 +284,7 @@ def get_redirect_url():
     return g.ret
 
 
-@app.route('/api/cron', methods=['GET', 'POST'])
+@app.route('/utils/cron', methods=['GET', 'POST'])
 def cron():
     current = datetime.datetime.now()
     match request.args['type']:
