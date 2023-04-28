@@ -589,6 +589,7 @@ if __name__ == "__main__":
                         stream.ack('receive', message_id)
                         if message_fields.get('source', '') != 'cron':
                             wxwork.send_text(text, [message_fields['source']])
+                        mysql.disconnect()
             elif stream_entries[0] == 'read':
                 for message_id, message_fields in stream_entries[1]:
                     logger.debug('new item in "%s": (%s) %s',
@@ -611,6 +612,7 @@ if __name__ == "__main__":
                         stream.ack('read', message_id)
                         if message_fields.get('source', '') != 'cron':
                             wxwork.send_text(text, [message_fields['source']])
+                        mysql.disconnect()
             elif stream_entries[0] == 'resend':
                 for message_id, message_fields in stream_entries[1]:
                     logger.debug('new item in "%s": (%s) %s',
@@ -627,5 +629,6 @@ if __name__ == "__main__":
                         stream.ack('resend', message_id)
                         if message_fields.get('source', '') != 'cron':
                             wxwork.send_text(text, [message_fields['source']])
+                        mysql.disconnect()
             else:
                 logger.debug('invalid stream_entries: %s', stream_entries)
