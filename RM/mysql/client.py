@@ -1,10 +1,13 @@
 # -*- coding: UTF-8 -*-
 from mysql.connector.cursor import MySQLCursor
+from mysql.connector.pooling import MySQLConnectionPool
 from . import var
 
 
 class Transaction:
     def __init__(self):
+        if not var.pool:
+            var.pool = MySQLConnectionPool(pool_name='RM', **var.kwargs)
         self._cnx = var.pool.get_connection()
 
     def __enter__(self):
@@ -31,6 +34,8 @@ class Transaction:
 
 class Selection:
     def __init__(self):
+        if not var.pool:
+            var.pool = MySQLConnectionPool(pool_name='RM', **var.kwargs)
         self._cnx = var.pool.get_connection()
 
     def __enter__(self):
