@@ -87,16 +87,22 @@ def read_document(work_path: str) -> Attachment:
                 logger.debug('reading others')
                 # 先尝试读表格
                 for i in range(document.Tables(1).Rows.Count):
-                    if '名称' in document.Tables(1).Cell(i+1, 1).Range.Text:
+                    if '项目名称' in document.Tables(1).Cell(i+1, 1).Range.Text:
                         name = document.Tables(1).Cell(i+1, 2).Range.Text
-                    if '委托单位' in document.Tables(1).Cell(i+1, 1).Range.Text:
+                    elif '报告名称' in document.Tables(1).Cell(i+1, 1).Range.Text:
+                        name = document.Tables(1).Cell(i+1, 2).Range.Text
+                    elif '系统名称' in document.Tables(1).Cell(i+1, 1).Range.Text:
+                        name = document.Tables(1).Cell(i+1, 2).Range.Text
+                    elif '委托单位' in document.Tables(1).Cell(i+1, 1).Range.Text:
+                        company = document.Tables(1).Cell(i+1, 2).Range.Text
+                    elif '被测单位' in document.Tables(1).Cell(i+1, 1).Range.Text:
                         company = document.Tables(1).Cell(i+1, 2).Range.Text
                 # 再尝试读行
                 for i in range(30):
                     paragraph = document.Paragraphs(i+1).Range.Text.strip()
-                    if '名称' in paragraph:
+                    if '项目名称' in paragraph or '报告名称' in paragraph or '系统名称' in paragraph:
                         name = re.sub('^.*名称(:|：)', '', paragraph)
-                    if '委托单位' in paragraph:
+                    elif '委托单位' in paragraph or '被测单位' in paragraph:
                         company = re.sub('^.*单位(:|：)', '', paragraph)
                     if name and company:
                         break
