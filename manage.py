@@ -164,6 +164,7 @@ def do_attend():
 
 @app.before_request
 def before_request():
+    g.ret = {'result': 0, 'err': '', 'data': {}}
     app.logger.debug('path: %s', request.path)
     g.client_ip = request.headers['X-Forwarded-For'].split(',')[0] \
         if 'X-Forwarded-For' in request.headers else request.remote_addr
@@ -171,7 +172,6 @@ def before_request():
         ipaddress.ip_address(g.client_ip)
     except ValueError as err:
         abort(400, err)
-    g.ret = {'result': 0, 'err': '', 'data': {}}
 
 
 @app.errorhandler(400)
@@ -193,7 +193,7 @@ def handle_KeyError(err):
 @app.errorhandler(Exception)
 def handle_Exception(err):
     app.logger.info('Exception: %s', err, exc_info=True)
-    g.ret['result'] = 3
+    g.ret['result'] = 500
     g.ret['err'] = str(err)
     return g.ret, 500
 
