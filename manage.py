@@ -9,6 +9,8 @@ from flask_jwt_extended import JWTManager
 from flask_cors import CORS
 
 import os
+from configparser import ConfigParser
+import logging.config
 import ipaddress
 import datetime
 import chinese_calendar
@@ -20,7 +22,7 @@ from RM.wxwork import WXWork
 
 
 app = Flask(__name__)
-app.config['JSON_AS_ASCII'] = False
+app.json.ensure_ascii = False
 app.config['JWT_SECRET_KEY'] = os.urandom(12)
 app.config['JWT_ERROR_MESSAGE_KEY'] = 'err'
 app.config['CORS_ORIGINS'] = ['https://rm.chenql.cn', 'http://localhost:5173']
@@ -29,91 +31,77 @@ jwt = JWTManager(app)
 cors = CORS(app)
 
 
-@app.before_first_request
-def before_first_request():
-    import os
-    from configparser import ConfigParser
-    config = ConfigParser()
-    config.read(os.path.join('conf', 'RM.conf'), encoding='UTF-8')
+# setup
+config = ConfigParser()
+config.read(os.path.join('conf', 'RM.conf'), encoding='UTF-8')
 
-    # ---运行模式（debug）---
-    global debug
-    debug = config.getboolean('mode', 'debug', fallback=False)
-
-    # ---logger---
-    import logging.config
-    dict_config = {
-        'version': 1,
-        'formatters': {
-            'main': {
-                'format': '%(asctime)s - %(levelname)s - %(name)s/%(funcName)s:%(lineno)d -> %(message)s',
-                'datefmt': '%Y-%m-%d %H:%M:%S',
-                # 'style': '%',
-                # 'validate': True,
-            },
+# ---运行模式（debug）---
+debug = config.getboolean('mode', 'debug', fallback=False)
+# ---logger---
+logging.config.dictConfig({
+    'version': 1,
+    'formatters': {
+        'main': {
+            'format': '%(asctime)s - %(levelname)s - %(name)s/%(funcName)s:%(lineno)d -> %(message)s',
+            'datefmt': '%Y-%m-%d %H:%M:%S',
+            # 'style': '%',
+            # 'validate': True,
         },
-        # 'filters': {},
-        'handlers': {
-            'console': {
-                'class': 'logging.StreamHandler',
-                'formatter': 'main',
-                'level': 'DEBUG',
-                # 'filters': '',
-                'stream': 'ext://sys.stdout',
-            },
+    },
+    # 'filters': {},
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'main',
+            'level': 'DEBUG',
+            # 'filters': '',
+            'stream': 'ext://sys.stdout',
         },
-        'loggers': {
-            '': {
-                'level': 'DEBUG',
-                'propagate': False,
-                # 'filters': [],
-                'handlers': ['console'],
-            },
+    },
+    'loggers': {
+        '': {
+            'level': 'DEBUG',
+            'propagate': False,
+            # 'filters': [],
+            'handlers': ['console'],
         },
-    }
-    logging.config.dictConfig(dict_config)
-
-    # ---mysql---
-    mysql.init(
-        user=config.get('mysql', 'user', fallback='rm'),
-        password=config.get('mysql', 'pass', fallback='rm'),
-        host=config.get('mysql', 'host', fallback='127.0.0.1'),
-        database=config.get('mysql', 'db', fallback='rm'),
-        port=config.getint('mysql', 'port', fallback=3306),
-    )
-
-    # ---redis---
-    global stream
-    stream = RedisStream(
-        host=config.get('redis', 'host', fallback='127.0.0.1'),
-        password=config.get('redis', 'pass', fallback='rm'),
-    )
-
-    # ---dingtalk---
-    global dingtalk
-    chatbot = {
+    },
+})
+# ---mysql---
+mysql.init(
+    user=config.get('mysql', 'user', fallback='rm'),
+    password=config.get('mysql', 'pass', fallback='rm'),
+    host=config.get('mysql', 'host', fallback='127.0.0.1'),
+    database=config.get('mysql', 'db', fallback='rm'),
+    port=config.getint('mysql', 'port', fallback=3306),
+)
+# ---redis---
+stream = RedisStream(
+    host=config.get('redis', 'host', fallback='127.0.0.1'),
+    password=config.get('redis', 'pass', fallback='rm'),
+)
+# ---dingtalk---
+dingtalk = Dingtalk(
+    {
         'webhook': config.get('dingtalk', 'webhook', fallback=''),
         'secret': config.get('dingtalk', 'secret', fallback=''),
-    }
-    chatbot_debug = {
+    },
+    {
         'webhook': config.get('dingtalk', 'webhook_debug', fallback=''),
-        'secret': config.get('dingtalk', 'secret_debug', fallback='')
-    }
-    dingtalk = Dingtalk(
-        chatbot,
-        chatbot_debug,
-        config.get('dingtalk', 'attend', fallback=''),
-        config.get('dingtalk', 'interaction', fallback=''),
-    )
+        'secret': config.get('dingtalk', 'secret_debug', fallback=''),
+    },
+    config.get('dingtalk', 'attend', fallback=''),
+    config.get('dingtalk', 'interaction', fallback=''),
+)
+# ---wxwork---
+wxwork = WXWork(
+    config.get('wxwork', 'corpid', fallback=''),
+    config.getint('wxwork', 'agentid', fallback=0),
+    config.get('wxwork', 'secret', fallback=''),
+    config.get('wxwork', 'admin_userid', fallback=''),
+)
 
-    # ---wxwork---
-    global wxwork
-    wxwork = WXWork(
-        config.get('wxwork', 'corpid', fallback=''),
-        config.getint('wxwork', 'agentid', fallback=0),
-        config.get('wxwork', 'secret', fallback=''),
-        config.get('wxwork', 'admin_userid', fallback=''),
-    )
+del config
 
 
 def do_attend():
