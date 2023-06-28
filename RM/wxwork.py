@@ -74,6 +74,8 @@ class WXWork:
                 if self._access_token != r['access_token']:
                     logger.info('refreshed access_token')
                     self._access_token = r['access_token']
+                    self._access_token_expire = datetime.datetime.now() + \
+                        datetime.timedelta(seconds=r['expires_in'] - 600)
                 return
             except:
                 logger.warning('gettoken error', exc_info=True)
