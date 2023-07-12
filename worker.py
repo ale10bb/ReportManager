@@ -615,7 +615,7 @@ if __name__ == "__main__":
                         text += f"\n错误信息: {err}"
                     finally:
                         stream.ack("receive", message_id)
-                        if message_fields.get("source", "") != "cron":
+                        if message_fields.setdefault("source", "") != "cron":
                             wxwork.send_text(text, [message_fields["source"]])
                         mysql.disconnect()
             elif stream_entries[0] == "read":
@@ -642,7 +642,7 @@ if __name__ == "__main__":
                         text += f"\n错误信息: {err}"
                     finally:
                         stream.ack("read", message_id)
-                        if message_fields.get("source", "") != "cron":
+                        if message_fields.setdefault("source", "") != "cron":
                             wxwork.send_text(text, [message_fields["source"]])
                         mysql.disconnect()
             elif stream_entries[0] == "resend":
@@ -666,7 +666,7 @@ if __name__ == "__main__":
                         text += f"\n错误信息: {err}"
                     finally:
                         stream.ack("resend", message_id)
-                        if message_fields.get("source", "") != "cron":
+                        if message_fields.setdefault("source", "") != "cron":
                             wxwork.send_text(text, [message_fields["source"]])
                         mysql.disconnect()
             else:
