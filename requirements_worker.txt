@@ -1,0 +1,8 @@
+# -- worker --
+mysql-connector-python
+redis
+DingtalkChatbot
+https://github.com/ale10bb/zmail/archive/refs/tags/v0.2.8.2.tar.gz
+walkdir
+python-docx
+pywin32
