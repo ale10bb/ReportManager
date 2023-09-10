@@ -450,11 +450,6 @@ def handle_finish(
             )
         ):
             shutil.rmtree(dir_path)
-        # 加密文件
-        for document_path in file_paths(
-            filtered_walk(new_work_path, included_files=["*.doc", "*.docx"])
-        ):
-            document.encrypt(document_path)
         # 发送邮件及通知
         archive_path = os.path.join(new_work_path, f"{codes}.rar")
         if not archive.archive(new_work_path, archive_path):
@@ -473,6 +468,11 @@ def handle_finish(
         )
         if os.path.exists(archive_path):
             os.remove(archive_path)
+        # 加密文件
+        for document_path in file_paths(
+            filtered_walk(new_work_path, included_files=["*.doc", "*.docx"])
+        ):
+            document.encrypt(document_path)
         message = notification.build_finish_dingtalk(record, warnings)
         dingtalk.send_markdown(
             message["subject"],
