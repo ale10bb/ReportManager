@@ -331,14 +331,12 @@ def mail():
 def resend_history():
     if not isinstance(request.json["id"], int):
         abort(400, "Inappropriate argument: id")
-    if not isinstance(request.json.setdefault("to", ""), str):
-        abort(400, "Inappropriate argument: to")
     entry_id = stream.add(
         source=g.user_id,
         name="resend",
         fields={
             "id": request.json["id"],
-            "redirect": request.json["to"],
+            "redirect": g.user_id,
         },
     )
     g.ret["data"]["entryid"] = entry_id
@@ -350,14 +348,11 @@ def resend_history():
 def resend_current():
     if not isinstance(request.json["id"], str):
         abort(400, "Inappropriate argument: id")
-    if not isinstance(request.json.setdefault("to", ""), str):
-        abort(400, "Inappropriate argument: to")
     entry_id = stream.add(
         source=g.user_id,
         name="resend",
         fields={
             "id": request.json["id"],
-            "redirect": request.json["to"],
         },
     )
     g.ret["data"]["entryid"] = entry_id
