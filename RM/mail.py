@@ -75,8 +75,9 @@ class Mail:
         logger.info("default_domain: %s", self._default_domain)
         if not isinstance(default_cc, str):
             raise TypeError("invalid arg: default_cc")
-        self._default_cc = f"{default_cc}@{default_domain}"
-        logger.info("default_cc: %s", self._default_cc)
+        if default_cc:
+            self._default_cc = f"{default_cc}@{default_domain}"
+            logger.info("default_cc: %s", self._default_cc)
 
     def receive(self, work_path: str, keywords: dict[str, str]) -> list[Parsed_Mail]:
         """按照{keywords}指定的关键词拉取邮件，并将原始邮件和附件存放在{work_path}
