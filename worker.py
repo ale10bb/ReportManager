@@ -5,6 +5,7 @@ import logging
 import logging.config
 import shutil
 import datetime
+from time import sleep
 from walkdir import filtered_walk, file_paths, dir_paths
 
 from RM import mysql, document, notification, validator
@@ -583,7 +584,13 @@ if __name__ == "__main__":
     while True:
         # 默认阻塞当前进程，直到队列中出现可用的对象
         logger.debug("waiting stream")
-        entries = stream.read()
+        entries = []
+        try:
+            entries = stream.read()
+        except Exception as e:
+            logger.error("stream.read() failed", exc_info=True)
+            sleep(60)
+            continue
         for stream_entries in entries:
             if stream_entries[0] == "receive":
                 for message_id, message_fields in stream_entries[1]:
