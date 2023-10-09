@@ -76,7 +76,7 @@ class RedisStream:
             consumername=socket.gethostname(),
             streams={"receive": ">", "read": ">", "resend": ">"},
             count=1,
-            block=0,
+            block=60000,
         )
         # > XREADGROUP GROUP mygroup myconsumer STREAMS mystream >
         # 1) 1) "mystream"
