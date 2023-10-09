@@ -182,6 +182,7 @@ def read_XT13(work_path: str) -> Attachment:
             if document:
                 document.Close(SaveChanges=0)
 
+    word.Quit()
     logger.debug("return: %s", ret)
     return ret
 
