@@ -519,7 +519,7 @@ def do_resend(id: str | int, redirect: str = ""):
         raise TypeError("invalid arg: id")
     if not record:
         raise ValueError("invalid arg: id")
-    if not isinstance(redirect, str) or not mysql.t_user.__contains__(redirect):
+    if not isinstance(redirect, str):
         logger.warning("invalid arg: redirect")
         redirect = ""
 
@@ -551,6 +551,9 @@ def do_resend(id: str | int, redirect: str = ""):
         resend_notification["subject"] = "(resend) " + resend_notification["subject"]
         to = redirect if redirect else record["authorid"]
         logger.info('resending "%s" (完成审核) to "%s"', codes, to)
+    target_user = mysql.t_user.fetch(to)
+    if not target_user:
+        raise ValueError("invalid arg: redirect")
 
     # 发送并清理临时文件
     archive_path = os.path.join(work_path, f"{codes}.rar")
@@ -559,7 +562,7 @@ def do_resend(id: str | int, redirect: str = ""):
     else:
         attachments = [archive_path]
     mail.send(
-        mysql.t_user.fetch(to)["email"],
+        target_user["email"],
         resend_notification["subject"],
         resend_notification["content"],
         attachments,
@@ -567,6 +570,14 @@ def do_resend(id: str | int, redirect: str = ""):
     )
     if os.path.exists(archive_path):
         os.remove(archive_path)
+
+    # 重发[完成审核]时，必要时通知原作者
+    if isinstance(record["id"], int) and to != record["authorid"]:
+        msg = (
+            "- [系统通知] -\n\n"
+            f"{target_user['name']}从机器人中下载了你的报告：{'、'.join(set([name for name in record['names'].values()]))}（委托单位：{record['company']}）"
+        )
+        wxwork.send_text(msg, to=[record["authorid"]], to_stdout=debug)
 
 
 if __name__ == "__main__":
