@@ -51,7 +51,7 @@ def read_document(work_path: str) -> Attachment:
             # 读项目编号
             # 印象中所有项目编号都能在前几行读到
             pattern = re.compile(
-                "SHTEC20[0-9]{2}(PRO|PST|DSYS|SOF|SRV|PER|FUN)[0-9]{4}([-_][0-9]+){0,1}"
+                "SHTEC20[0-9]{2}(PRO|PST|DSYS|SOF|SRV|PER|FUN|PCT)[0-9]{4}([-_][0-9]+){0,1}"
             )
             for i in range(5):
                 re_result = re.search(pattern, document.Paragraphs(i + 1).Range.Text)
@@ -70,8 +70,8 @@ def read_document(work_path: str) -> Attachment:
                 # 从基本信息表中读取
                 name = document.Tables(2).Cell(2, 2).Range.Text
                 company = document.Tables(2).Cell(5, 2).Range.Text
-            elif "PRO" in code or "PST" in code or "PER" in code:
-                logger.debug("reading PRO/PST/PER")
+            elif "PRO" in code or "PST" in code or "PER" in code or "PCT" in code:
+                logger.debug("reading PRO/PST/PER/PCT")
                 # 直接从第一个表格中读取
                 name = document.Tables(1).Cell(1, 2).Range.Text
                 company = document.Tables(1).Cell(2, 2).Range.Text
@@ -153,7 +153,7 @@ def read_XT13(work_path: str) -> Attachment:
     document_paths = file_paths(
         filtered_walk(
             work_path,
-            included_files=["*XT13*.docx", "*签发意见单*.docx"],
+            included_files=["*XT13*.docx", "*MP07*.docx", "*签发意见单*.docx"],
             excluded_files=["~$*"],
         )
     )
@@ -166,7 +166,7 @@ def read_XT13(work_path: str) -> Attachment:
         try:
             document = word.Documents.Open(FileName=document_path)
             re_result = re.search(
-                "SHTEC20[0-9]{2}(PRO|PST|DSYS|SOF|SRV|PER|FUN)[0-9]{4}([-_][0-9]+){0,1}",
+                "SHTEC20[0-9]{2}(PRO|PST|DSYS|SOF|SRV|PER|FUN|PCT)[0-9]{4}([-_][0-9]+){0,1}",
                 document.Paragraphs(1).Range.Text,
             )
             if re_result:
