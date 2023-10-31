@@ -503,6 +503,9 @@ def search_user():
 @jwt_required()
 def list_queue():
     g.ret["data"]["queue"] = mysql.t_user.pop(count=9999, hide_busy=False)
+    for item in g.ret["data"]["queue"]:
+        del item["phone"]
+        del item["email"]
     return g.ret
 
 
