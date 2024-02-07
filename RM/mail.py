@@ -48,6 +48,7 @@ class Mail:
             pop_port=pop3_config.setdefault("port", 110),
             pop_ssl=pop3_config.setdefault("ssl", False),
             pop_tls=pop3_config.setdefault("tls", False),
+            timeout=300,
         ).pop_able():
             raise ValueError("Failed to login POP3 Server.")
         self._pop3_config = pop3_config
@@ -63,6 +64,7 @@ class Mail:
             smtp_port=smtp_config.setdefault("port", 110),
             smtp_ssl=smtp_config.setdefault("ssl", False),
             smtp_tls=smtp_config.setdefault("tls", False),
+            timeout=300,
         ).smtp_able():
             raise ValueError("Failed to login SMTP Server.")
         self._smtp_config = smtp_config
@@ -101,6 +103,7 @@ class Mail:
             pop_port=self._pop3_config["port"],
             pop_ssl=self._pop3_config["ssl"],
             pop_tls=self._pop3_config["tls"],
+            timeout=300,
         )
         if not pop3_server.pop_able():
             logger.error("pop3_server unable")
@@ -235,7 +238,10 @@ class Mail:
         mail = {
             "subject": subject,
             "from": formataddr(
-                (Header("审核管理机器人", "utf-8").encode(), self._smtp_config["username"])
+                (
+                    Header("审核管理机器人", "utf-8").encode(),
+                    self._smtp_config["username"],
+                )
             ),
             "content_text": content,
             "attachments": attachments,
@@ -252,6 +258,7 @@ class Mail:
                 smtp_port=self._smtp_config["port"],
                 smtp_ssl=self._smtp_config["ssl"],
                 smtp_tls=self._smtp_config["tls"],
+                timeout=300,
             )
             if self._default_cc and needs_cc:
                 smtp_server.send_mail([recipient], mail, cc=self._default_cc)
